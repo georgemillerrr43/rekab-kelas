@@ -14,8 +14,15 @@ export async function GET(request: NextRequest) {
   try {
     const targetDate = new Date(tanggal);
 
+    let kelasRecord = await prisma.kelas.findFirst({
+      where: { OR: [{ id: kelas }, { nama: kelas }] },
+    });
+    if (!kelasRecord) {
+      return NextResponse.json({ error: 'Kelas tidak ditemukan' }, { status: 404 });
+    }
+
     const students = await prisma.siswa.findMany({
-      where: { kelasId: kelas },
+      where: { kelasId: kelasRecord.id },
       orderBy: { nis: 'asc' },
     });
 

@@ -14,11 +14,7 @@ export default function GuruDashboard() {
         if (res.ok) {
           const d = await res.json();
           setStats(d);
-        }
-        const absRes = await fetch('/api/guru/absensi');
-        if (absRes.ok) {
-          const absData = await absRes.json();
-          setKelasNama(absData.kelas?.nama || '');
+          if (d.kelasNama) setKelasNama(d.kelasNama);
         }
       } catch { /* ignore */ }
     })();

@@ -11,9 +11,11 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
     pathname === '/favicon.ico' ||
+    pathname === '/favicon.svg' ||
     pathname.startsWith('/uploads') ||
     pathname.startsWith('/api/uploads') ||
-    pathname.startsWith('/api/rekap')
+    pathname.startsWith('/api/rekap') ||
+    pathname.startsWith('/api/kelas')
   ) {
     return NextResponse.next();
   }

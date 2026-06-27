@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const totalDays = new Set(kehadiran.map(k => k.tanggal.toISOString())).size || 1;
     const avgAttendance = siswaIds.length > 0 ? ((stats.hadir / (siswaIds.length * totalDays)) * 100).toFixed(1) : '0';
 
-    return NextResponse.json({ avgAttendance, totalStudents: siswaIds.length, stats, totalDays });
+    return NextResponse.json({ avgAttendance, totalStudents: siswaIds.length, stats, totalDays, kelasNama: guru.kelas.nama });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         nis: siswa.nis,
         nama: siswa.nama,
         whatsappOrangTua: siswa.whatsappOrangTua,
-        status: khd?.status || 'HADIR',
+        status: khd?.status || 'BELUM',
         alasan: khd?.izin?.alasan || '',
         buktiUrl: khd?.izin?.buktiFoto || '',
       };

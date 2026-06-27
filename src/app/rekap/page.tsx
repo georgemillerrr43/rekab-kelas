@@ -15,6 +15,7 @@ const MONTH_MAP: Record<string, { month: number; year: number }> = {
 };
 
 function exportDailyPDF(students: DailyStudent[], kelas: string, tanggal: string) {
+  if (!kelas) return;
   import('jspdf').then((m) => {
     import('jspdf-autotable').then(() => {
       const { default: jsPDF } = m;
@@ -61,6 +62,7 @@ function exportDailyPDF(students: DailyStudent[], kelas: string, tanggal: string
 function RekapPageInner() {
   const sp = useSearchParams();
   const [tab, setTab] = useState<TabType>((sp.get('tab') as TabType) || 'bulanan');
+  const [session, setSession] = useState<{ isLoggedIn: boolean; role: 'ADMIN' | 'GURU' | 'SISWA' | null }>({ isLoggedIn: false, role: null });
   const [kelas, setKelas] = useState('');
   const [bulan, setBulan] = useState('Juni 2026');
   const [kelasList, setKelasList] = useState<{ id: string; nama: string; waliKelas: string }[]>([]);
@@ -77,23 +79,43 @@ function RekapPageInner() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [filledDates, setFilledDates] = useState<string[]>([]);
 
+  // Get session and kelas list
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/admin/kelas');
-        const list = (await res.json()).kelas || [];
-        if (list.length > 0) { setKelas(list[0].id); setWaliKelas(list[0].waliKelas); setHKelas(list[0].id); }
+        const sessRes = await fetch('/api/auth/session');
+        const sessData = await sessRes.json();
+        setSession(sessData);
+
+        // Guru: langsung pake kelasId dari API guru
+        if (sessData.role === 'GURU') {
+          const guruRes = await fetch('/api/guru/absensi');
+          if (guruRes.ok) {
+            const guruData = await guruRes.json();
+            if (guruData.kelas?.id) {
+              setKelas(guruData.kelas.id);
+              setHKelas(guruData.kelas.id);
+              setWaliKelas(guruData.kelas.waliKelas);
+            }
+          }
+        } else {
+          // Admin: fetch daftar kelas
+          const res = await fetch('/api/kelas');
+          const list = (await res.json()).kelas || [];
+          setKelasList(list);
+          if (list.length > 0) { setKelas(list[0].id); setWaliKelas(list[0].waliKelas); setHKelas(list[0].id); }
+        }
       } catch { /* empty */ }
     })();
   }, []);
 
   useEffect(() => {
-    if (tab !== 'bulanan') return;
+    if (tab !== 'bulanan' || !kelas) return;
     (async () => { setIsLoading(true); try { setRekapList((await (await fetch(`/api/rekap?kelas=${kelas}&bulan=${bulan}`)).json()).rekap || []); } catch { /* empty */ } finally { setIsLoading(false); } })();
   }, [kelas, bulan, tab]);
 
   useEffect(() => {
-    if (tab !== 'harian' || !hTanggal) { setHStudents([]); setHFetched(false); return; }
+    if (tab !== 'harian' || !hTanggal || !hKelas) { setHStudents([]); setHFetched(false); return; }
     (async () => {
       setHLoading(true);
       try {
@@ -105,9 +127,12 @@ function RekapPageInner() {
   }, [hKelas, hTanggal, tab]);
 
   useEffect(() => {
-    if (tab !== 'harian') return;
+    if (tab !== 'harian' || !hKelas) return;
     (async () => { try { const res = await fetch(`/api/rekap/harian/status?kelas=${hKelas}&bulan=${hBulan}`); if (res.ok) setFilledDates((await res.json()).filledDates || []); } catch { /* empty */ } })();
   }, [hKelas, hBulan, tab]);
+
+  const isAdmin = session.role === 'ADMIN';
+  const selectedKelasNama = kelasList.find(k => k.id === kelas)?.nama || kelas.replace(/-/g, ' ') || '';
 
   const total = rekapList.length;
   const avg = total > 0 ? rekapList.reduce((a, c) => a + c.persentase, 0) / total : 0;
@@ -129,7 +154,7 @@ function RekapPageInner() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="page-header flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div><span className="badge badge-gray mb-2">Rekapitulasi</span><h1>Rekapitulasi Kehadiran Kelas</h1><p>Akumulasi otomatis dan download laporan siap cetak.</p></div>
         <div className="tab-switcher">
@@ -146,8 +171,11 @@ function RekapPageInner() {
 
       {tab === 'bulanan' && (
         <div className="space-y-6">
-          <div className="flex justify-end">
-            <button onClick={() => exportAttendanceToPDF(rekapList, { kelas: kelas.replace(/-/g, ' '), periode: bulan, waliKelas })} className="btn-primary px-5 py-2.5 text-sm font-semibold">
+          <div className="flex justify-center">
+            <button onClick={() => {
+              const wk = kelasList.find(k => k.id === kelas)?.waliKelas || waliKelas;
+              exportAttendanceToPDF(rekapList, { kelas: selectedKelasNama, periode: bulan, waliKelas: wk });
+            }} className="btn-primary px-5 py-2.5 text-sm font-semibold" disabled={rekapList.length === 0}>
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 inline mr-2 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
               Export PDF
             </button>
@@ -160,18 +188,19 @@ function RekapPageInner() {
             <div className="stat-card"><p className="label">Total Izin / Sakit</p><p className="value text-[var(--warning)]">{totalIzinSakit} Kali</p><span className="text-[11px] text-[var(--text-muted)]">Disertai Bukti</span></div>
           </div>
 
-          <div className="glass-card p-5">
-            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Filter</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-1">Kelas</label><select value={kelas} onChange={(e) => setKelas(e.target.value)} className="glass-select w-full p-2 rounded-lg text-sm">{kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>))}</select></div>
-              <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-1">Bulan</label><select value={bulan} onChange={(e) => setBulan(e.target.value)} className="glass-select w-full p-2 rounded-lg text-sm"><option value="Juni 2026">Juni 2026</option><option value="Mei 2026">Mei 2026</option><option value="April 2026">April 2026</option></select></div>
-              <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-1">Wali Kelas</label><input type="text" value={waliKelas} onChange={(e) => setWaliKelas(e.target.value)} className="glass-input w-full p-2 rounded-lg text-sm" /></div>
+          {isAdmin && (
+            <div className="glass-card p-5">
+              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Filter</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-1">Kelas</label><select value={kelas} onChange={(e) => { const k = e.target.value; setKelas(k); const found = kelasList.find(x => x.id === k); if (found) setWaliKelas(found.waliKelas); }} className="glass-select w-full p-2 rounded-lg text-sm">{kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>))}</select></div>
+                <div><label className="block text-xs font-medium text-[var(--text-muted)] mb-1">Bulan</label><select value={bulan} onChange={(e) => setBulan(e.target.value)} className="glass-select w-full p-2 rounded-lg text-sm"><option value="Juni 2026">Juni 2026</option><option value="Mei 2026">Mei 2026</option><option value="April 2026">April 2026</option></select></div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="glass-card overflow-hidden">
             <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex justify-between items-center">
-              <h3 className="font-bold text-[var(--text-primary)] text-base">Detail Kehadiran</h3>
+              <h3 className="font-bold text-[var(--text-primary)] text-base">Detail Kehadiran {selectedKelasNama}</h3>
               <span className="badge badge-gray">{bulan}</span>
             </div>
             <div className="overflow-x-auto">
@@ -179,7 +208,7 @@ function RekapPageInner() {
                 <thead><tr><th className="text-center w-16">No</th><th>NIS</th><th>Nama</th><th className="text-center">Hadir</th><th className="text-center">Izin</th><th className="text-center">Sakit</th><th className="text-center">Alpa</th><th className="text-center w-32">% Hadir</th></tr></thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
                   {isLoading ? <tr><td colSpan={8} className="p-10 text-center text-[var(--text-muted)] text-sm">Memuat...</td></tr>
-                    : rekapList.length === 0 ? <tr><td colSpan={8} className="p-10 text-center text-[var(--text-muted)] text-sm">Tidak ada data.</td></tr>
+                    : rekapList.length === 0 ? <tr><td colSpan={8} className="p-10 text-center text-[var(--text-muted)] text-sm">Belum ada data absensi bulan ini.</td></tr>
                     : rekapList.map((item, i) => (
                       <tr key={item.nis} className="hover:bg-[var(--bg-glass)] transition-colors">
                         <td className="text-center font-mono text-[var(--text-muted)]">{i + 1}</td>
@@ -206,17 +235,19 @@ function RekapPageInner() {
 
       {tab === 'harian' && (
         <div className="space-y-6">
-          <div className="glass-card p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Kelas</label><select value={hKelas} onChange={(e) => setHKelas(e.target.value)} className="glass-select w-full p-2.5 rounded-lg text-sm">{kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>))}</select></div>
-              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Bulan</label><select value={hBulan} onChange={(e) => { setHBulan(e.target.value); setHTanggal(null); }} className="glass-select w-full p-2.5 rounded-lg text-sm"><option value="Juni 2026">Juni 2026</option><option value="Mei 2026">Mei 2026</option><option value="April 2026">April 2026</option></select></div>
+          {isAdmin && (
+            <div className="glass-card p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Kelas</label><select value={hKelas} onChange={(e) => setHKelas(e.target.value)} className="glass-select w-full p-2.5 rounded-lg text-sm">{kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>))}</select></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Bulan</label><select value={hBulan} onChange={(e) => { setHBulan(e.target.value); setHTanggal(null); }} className="glass-select w-full p-2.5 rounded-lg text-sm"><option value="Juni 2026">Juni 2026</option><option value="Mei 2026">Mei 2026</option><option value="April 2026">April 2026</option></select></div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="glass-card p-6">
             <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4 uppercase tracking-wider">Pilih Tanggal</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {getDays(hBulan).map((day) => {
+              {getDays(isAdmin ? hBulan : bulan).map((day) => {
                 const active = hTanggal === day.dateStr;
                 const filled = filledDates.includes(day.dateStr);
                 return (
@@ -237,7 +268,7 @@ function RekapPageInner() {
               <div className="flex flex-col sm:flex-row justify-between items-center glass-card p-5 gap-3">
                 <div><h3 className="font-bold text-[var(--text-primary)] text-sm">Laporan: {fmtDate}</h3></div>
                 <div className="flex gap-2 w-full sm:w-auto">
-                  <button onClick={() => exportDailyPDF(hStudents, hKelas, hTanggal)} disabled={hStudents.length === 0} className="btn-primary flex-1 sm:flex-initial px-5 py-2 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
+                  <button onClick={() => exportDailyPDF(hStudents, selectedKelasNama || hKelas, hTanggal)} disabled={hStudents.length === 0} className="btn-primary flex-1 sm:flex-initial px-5 py-2 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                     Export PDF
                   </button>
@@ -248,50 +279,56 @@ function RekapPageInner() {
                 </div>
               </div>
 
-              {hFetched && !hLoading && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  {[
-                    { label: 'Hadir', value: hSummary.hadir, color: 'text-[var(--bullish)]' },
-                    { label: 'Izin', value: hSummary.izin, color: 'text-[var(--warning)]' },
-                    { label: 'Sakit', value: hSummary.sakit, color: 'text-[var(--info)]' },
-                    { label: 'Alpa', value: hSummary.alpa, color: 'text-[var(--bearish)]' },
-                    { label: 'Total', value: hSummary.total, color: 'text-[var(--text-primary)]' },
-                  ].map((s) => (<div key={s.label} className="stat-card p-4"><p className="label">{s.label}</p><p className={`value text-lg ${s.color}`}>{s.value}</p></div>))}
-                </div>
-              )}
+              {hLoading ? (
+                <div className="text-center py-10 text-[var(--text-muted)] font-semibold">Memuat data...</div>
+              ) : !hFetched ? (
+                <div className="text-center py-10 text-[var(--text-muted)] font-semibold">Pilih tanggal untuk melihat data.</div>
+              ) : hStudents.length === 0 ? (
+                <div className="text-center py-10 text-[var(--text-muted)] font-semibold">Tidak ada data absensi untuk tanggal ini.</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {[
+                      { label: 'Hadir', value: hSummary.hadir, color: 'text-[var(--bullish)]' },
+                      { label: 'Izin', value: hSummary.izin, color: 'text-[var(--warning)]' },
+                      { label: 'Sakit', value: hSummary.sakit, color: 'text-[var(--info)]' },
+                      { label: 'Alpa', value: hSummary.alpa, color: 'text-[var(--bearish)]' },
+                      { label: 'Total', value: hSummary.total, color: 'text-[var(--text-primary)]' },
+                    ].map((s) => (<div key={s.label} className="stat-card p-4"><p className="label">{s.label}</p><p className={`value text-lg ${s.color}`}>{s.value}</p></div>))}
+                  </div>
 
-              <div className="glass-card overflow-hidden">
-                <div className="px-6 py-4 border-b border-[var(--border-subtle)]"><h3 className="font-bold text-[var(--text-primary)] text-base">Kehadiran Per Hari</h3><p className="text-xs text-[var(--text-muted)]">{fmtDate} — {hKelas.replace(/-/g, ' ')}</p></div>
-                <div className="overflow-x-auto">
-                  <table className="table-premium">
-                    <thead><tr><th className="text-center w-16">No</th><th>NIS</th><th>Nama</th><th className="text-center">Status</th><th>Keterangan</th></tr></thead>
-                    <tbody className="divide-y divide-[var(--border-subtle)]">
-                      {hLoading ? <tr><td colSpan={5} className="p-10 text-center text-[var(--text-muted)] text-sm">Memuat...</td></tr>
-                        : !hFetched || hStudents.length === 0 ? <tr><td colSpan={5} className="p-10 text-center text-[var(--text-muted)] text-sm">Tidak ada data absensi.</td></tr>
-                        : hStudents.map((s, idx) => (
-                          <tr key={s.siswaId} className="hover:bg-[var(--bg-glass)] transition-colors">
-                            <td className="text-center font-mono text-[var(--text-muted)]">{idx + 1}</td>
-                            <td className="font-mono">{s.nis}</td>
-                            <td><p className="font-bold text-[var(--text-primary)] text-sm">{s.nama}</p></td>
-                            <td className="text-center"><span className={`badge ${sc(s.status)}`}>{s.status === 'BELUM' ? 'Belum' : s.status}</span></td>
-                            <td>
-                              <div className="flex items-center gap-2">
-                                <span>{s.alasan || <span className="opacity-30">-</span>}</span>
-                                {(s.status === 'IZIN' || s.status === 'SAKIT') && s.buktiUrl && (
-                                  <button onClick={() => setSelectedPhoto(s.buktiUrl.startsWith('/uploads') ? s.buktiUrl.replace('/uploads', '/api/uploads') : s.buktiUrl)}
-                                    className="px-2 py-1 text-[10px] font-bold text-[var(--text-accent)] bg-[rgba(59,130,246,0.1)] hover:bg-[rgba(59,130,246,0.15)] rounded-lg border border-[rgba(59,130,246,0.2)] transition-all ml-auto shrink-0">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 inline mr-1 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375 3.75 0 1 1-.75 0 .375 3.75 0 0 1 .75 0Z" /></svg>
-                                    Foto
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                  <div className="glass-card overflow-hidden">
+                    <div className="px-6 py-4 border-b border-[var(--border-subtle)]"><h3 className="font-bold text-[var(--text-primary)] text-base">Kehadiran Per Hari</h3><p className="text-xs text-[var(--text-muted)]">{fmtDate} — {selectedKelasNama || hKelas}</p></div>
+                    <div className="overflow-x-auto">
+                      <table className="table-premium">
+                        <thead><tr><th className="text-center w-16">No</th><th>NIS</th><th>Nama</th><th className="text-center">Status</th><th>Keterangan</th></tr></thead>
+                        <tbody className="divide-y divide-[var(--border-subtle)]">
+                          {hStudents.map((s, idx) => (
+                            <tr key={s.siswaId} className="hover:bg-[var(--bg-glass)] transition-colors">
+                              <td className="text-center font-mono text-[var(--text-muted)]">{idx + 1}</td>
+                              <td className="font-mono">{s.nis}</td>
+                              <td><p className="font-bold text-[var(--text-primary)] text-sm">{s.nama}</p></td>
+                              <td className="text-center"><span className={`badge ${sc(s.status)}`}>{s.status === 'BELUM' ? 'Belum' : s.status}</span></td>
+                              <td>
+                                <div className="flex items-center gap-2">
+                                  <span>{s.alasan || <span className="opacity-30">-</span>}</span>
+                                  {(s.status === 'IZIN' || s.status === 'SAKIT') && s.buktiUrl && (
+                                    <button onClick={() => setSelectedPhoto(s.buktiUrl.startsWith('/uploads') ? s.buktiUrl.replace('/uploads', '/api/uploads') : s.buktiUrl)}
+                                      className="px-2 py-1 text-[10px] font-bold text-[var(--text-accent)] bg-[rgba(59,130,246,0.1)] hover:bg-[rgba(59,130,246,0.15)] rounded-lg border border-[rgba(59,130,246,0.2)] transition-all ml-auto shrink-0">
+                                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3 h-3 inline mr-1 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375 3.75 0 1 1-.75 0 .375 3.75 0 0 1 .75 0Z" /></svg>
+                                      Foto
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="glass-card p-8 text-center text-[var(--text-muted)] font-semibold">Pilih tanggal untuk melihat rekap harian.</div>

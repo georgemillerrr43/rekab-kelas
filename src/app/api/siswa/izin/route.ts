@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { decryptSession } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 
 // POST /api/siswa/izin - Siswa mengajukan izin/sakit mandiri
 export async function POST(request: NextRequest) {
-  const sessionToken = request.cookies.get('session_token')?.value;
-  if (!sessionToken || !sessionToken.startsWith('SISWA.')) {
+  const session = getSession(request);
+  if (!session || session.role !== 'SISWA') {
     return NextResponse.json({ error: 'Akses ditolak. Hanya Siswa.' }, { status: 403 });
-  }
-
-  const session = decryptSession(sessionToken);
-  if (!session) {
-    return NextResponse.json({ error: 'Session tidak valid.' }, { status: 401 });
   }
 
   try {
@@ -89,14 +84,9 @@ export async function POST(request: NextRequest) {
 
 // GET /api/siswa/izin - Ambil riwayat izin milik siswa yang login
 export async function GET(request: NextRequest) {
-  const sessionToken = request.cookies.get('session_token')?.value;
-  if (!sessionToken || !sessionToken.startsWith('SISWA.')) {
+  const session = getSession(request);
+  if (!session || session.role !== 'SISWA') {
     return NextResponse.json({ error: 'Akses ditolak.' }, { status: 403 });
-  }
-
-  const session = decryptSession(sessionToken);
-  if (!session) {
-    return NextResponse.json({ error: 'Session tidak valid.' }, { status: 401 });
   }
 
   const izinList = await prisma.izin.findMany({
