@@ -1,0 +1,108 @@
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function GET(request: NextRequest) {
+  const sessionToken = request.cookies.get('session_token')?.value;
+  if (!sessionToken || !sessionToken.startsWith('ADMIN.')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const totalStudents = await prisma.siswa.count();
+    const pendingIzinCount = await prisma.izin.count({
+      where: { statusApproval: 'PENDING' },
+    });
+
+    const todayKehadiran = await prisma.kehadiran.findMany({
+      where: { tanggal: today },
+    });
+    const todayHadir = todayKehadiran.filter((k) => k.status === 'HADIR').length;
+    const todayStats = `${todayHadir}/${totalStudents}`;
+
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+
+    const monthlyKehadiran = await prisma.kehadiran.findMany({
+      where: {
+        tanggal: {
+          gte: startOfMonth,
+          lte: endOfMonth,
+        },
+      },
+    });
+
+    const totalKhd = monthlyKehadiran.length;
+    const totalHadir = monthlyKehadiran.filter((k) => k.status === 'HADIR').length;
+    const totalIzin = monthlyKehadiran.filter((k) => k.status === 'IZIN').length;
+    const totalSakit = monthlyKehadiran.filter((k) => k.status === 'SAKIT').length;
+    const totalAlpa = monthlyKehadiran.filter((k) => k.status === 'ALPA').length;
+
+    const avgAttendance = totalKhd > 0 ? ((totalHadir / totalKhd) * 100).toFixed(1) : '100.0';
+
+    const distribution = [
+      { label: 'Hadir', value: totalKhd > 0 ? Number(((totalHadir / totalKhd) * 100).toFixed(1)) : 0, color: 'bg-emerald-500' },
+      { label: 'Izin', value: totalKhd > 0 ? Number(((totalIzin / totalKhd) * 100).toFixed(1)) : 0, color: 'bg-amber-400' },
+      { label: 'Sakit', value: totalKhd > 0 ? Number(((totalSakit / totalKhd) * 100).toFixed(1)) : 0, color: 'bg-sky-400' },
+      { label: 'Alpa', value: totalKhd > 0 ? Number(((totalAlpa / totalKhd) * 100).toFixed(1)) : 0, color: 'bg-rose-500' },
+    ];
+
+    const absentees = await prisma.siswa.findMany({
+      select: {
+        nis: true,
+        nama: true,
+        kehadiran: {
+          where: {
+            status: 'ALPA',
+            tanggal: { gte: startOfMonth, lte: endOfMonth },
+          },
+        },
+      },
+    });
+
+    const topAbsentees = absentees
+      .map((s) => ({
+        nis: s.nis,
+        nama: s.nama,
+        alpa: s.kehadiran.length,
+      }))
+      .filter((s) => s.alpa > 0)
+      .sort((a, b) => b.alpa - a.alpa)
+      .slice(0, 4);
+
+    const getDayPercentage = (offset: number) => {
+      const d = new Date(today);
+      const currentDay = d.getDay();
+      const distance = offset - currentDay;
+      d.setDate(d.getDate() + distance);
+      d.setHours(0, 0, 0, 0);
+
+      const dayKhd = monthlyKehadiran.filter((k) => k.tanggal.getTime() === d.getTime());
+      if (dayKhd.length === 0) return 100;
+      const h = dayKhd.filter((k) => k.status === 'HADIR').length;
+      return Math.round((h / dayKhd.length) * 100);
+    };
+
+    const dataMingguan = [
+      { hari: 'Senin', persen: getDayPercentage(1) },
+      { hari: 'Selasa', persen: getDayPercentage(2) },
+      { hari: 'Rabu', persen: getDayPercentage(3) },
+      { hari: 'Kamis', persen: getDayPercentage(4) },
+      { hari: 'Jumat', persen: getDayPercentage(5) },
+    ];
+
+    return NextResponse.json({
+      avgAttendance,
+      todayStats,
+      pendingIzinCount,
+      totalStudents,
+      topAbsentees,
+      distribution,
+      dataMingguan,
+    });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}

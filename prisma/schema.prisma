@@ -1,0 +1,80 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AttendanceStatus {
+  HADIR
+  IZIN
+  SAKIT
+  ALPA
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String   // Hashed password
+  nama      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Kelas {
+  id         String   @id @default(uuid())
+  nama       String   @unique // e.g., "XI-RPL-1"
+  waliKelas  String   // Nama guru/wali kelas/penanda tangan
+  siswa      Siswa[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Siswa {
+  id               String      @id @default(uuid())
+  nis              String      @unique
+  nama             String
+  kelasId          String      @default("default-kelas-id")
+  kelas            Kelas       @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  whatsappOrangTua String
+  username         String      @unique
+  password         String
+  kehadiran        Kehadiran[]
+  izin             Izin[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Kehadiran {
+  id        String           @id @default(uuid())
+  tanggal   DateTime         @db.Date
+  status    AttendanceStatus @default(HADIR)
+  siswaId   String
+  siswa     Siswa            @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  izinId    String?          @unique
+  izin      Izin?            @relation(fields: [izinId], references: [id], onDelete: SetNull)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([siswaId, tanggal]) // Satu siswa hanya punya 1 status per hari
+}
+
+model Izin {
+  id             String         @id @default(uuid())
+  alasan         String         @db.Text
+  buktiFoto      String         // Path penyimpanan foto bukti, e.g., /uploads/bukti-uuid.jpg
+  statusApproval ApprovalStatus @default(PENDING)
+  siswaId        String
+  siswa          Siswa          @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  kehadiran      Kehadiran?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}

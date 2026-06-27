@@ -1,0 +1,148 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { decryptSession } from '@/lib/auth';
+import { sendWhatsAppNotification } from '@/utils/waNotification';
+
+export async function GET(request: NextRequest) {
+  const sessionToken = request.cookies.get('session_token')?.value;
+  if (!sessionToken || !sessionToken.startsWith('ADMIN.')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const kelas = searchParams.get('kelas');
+  const tanggal = searchParams.get('tanggal');
+
+  if (!kelas || !tanggal) {
+    return NextResponse.json({ error: 'Bad Request' }, { status: 400 });
+  }
+
+  try {
+    const targetDate = new Date(tanggal);
+    const students = await prisma.siswa.findMany({
+      where: { kelasId: kelas },
+      orderBy: { nis: 'asc' },
+    });
+
+    const kehadiran = await prisma.kehadiran.findMany({
+      where: {
+        siswaId: { in: students.map((s) => s.id) },
+        tanggal: targetDate,
+      },
+      include: { izin: true },
+    });
+
+    const result = students.map((siswa) => {
+      const khd = kehadiran.find((k) => k.siswaId === siswa.id);
+      return {
+        id: siswa.id,
+        nis: siswa.nis,
+        nama: siswa.nama,
+        whatsappOrangTua: siswa.whatsappOrangTua,
+        status: khd?.status || 'HADIR',
+        alasan: khd?.izin?.alasan || '',
+        buktiUrl: khd?.izin?.buktiFoto || '',
+      };
+    });
+
+    const alreadySubmitted = kehadiran.length > 0;
+    return NextResponse.json({ students: result, alreadySubmitted });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const sessionToken = request.cookies.get('session_token')?.value;
+  if (!sessionToken || !sessionToken.startsWith('ADMIN.')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
+
+  try {
+    const { tanggal, data } = await request.json();
+    if (!tanggal || !Array.isArray(data)) {
+      return NextResponse.json({ error: 'Bad Request' }, { status: 400 });
+    }
+
+    const targetDate = new Date(tanggal);
+
+    for (const item of data) {
+      const { siswaId, status, alasan, buktiUrl } = item;
+
+      const student = await prisma.siswa.findUnique({
+        where: { id: siswaId },
+      });
+
+      if (!student) continue;
+
+      const existingKhd = await prisma.kehadiran.findUnique({
+        where: { siswaId_tanggal: { siswaId, tanggal: targetDate } },
+      });
+
+      if (status === 'HADIR' || status === 'ALPA') {
+        if (existingKhd?.izinId) {
+          await prisma.kehadiran.update({
+            where: { id: existingKhd.id },
+            data: { status, izin: { delete: true } },
+          });
+        } else {
+          await prisma.kehadiran.upsert({
+            where: { siswaId_tanggal: { siswaId, tanggal: targetDate } },
+            update: { status },
+            create: { siswaId, tanggal: targetDate, status },
+          });
+        }
+
+        if (status === 'ALPA') {
+          await sendWhatsAppNotification({
+            namaSiswa: student.nama,
+            nis: student.nis,
+            tanggal,
+            status: 'ALPA',
+            whatsappOrangTua: student.whatsappOrangTua,
+          });
+        }
+      } else if (status === 'IZIN' || status === 'SAKIT') {
+        let newIzin;
+        if (existingKhd?.izinId) {
+          newIzin = await prisma.izin.update({
+            where: { id: existingKhd.izinId },
+            data: {
+              alasan: alasan || '',
+              buktiFoto: buktiUrl || '',
+              statusApproval: 'APPROVED',
+            },
+          });
+        } else {
+          newIzin = await prisma.izin.create({
+            data: {
+              siswaId,
+              alasan: alasan || '',
+              buktiFoto: buktiUrl || '',
+              statusApproval: 'APPROVED',
+            },
+          });
+        }
+
+        await prisma.kehadiran.upsert({
+          where: { siswaId_tanggal: { siswaId, tanggal: targetDate } },
+          update: { status, izinId: newIzin.id },
+          create: { siswaId, tanggal: targetDate, status, izinId: newIzin.id },
+        });
+
+        await sendWhatsAppNotification({
+          namaSiswa: student.nama,
+          nis: student.nis,
+          tanggal,
+          status,
+          whatsappOrangTua: student.whatsappOrangTua,
+          alasan,
+        });
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}

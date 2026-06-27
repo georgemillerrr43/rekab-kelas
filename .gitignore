@@ -1,0 +1,69 @@
+# Node / Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# Next.js / Build outputs
+.next/
+out/
+build/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Prisma / Database
+.prisma/
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment variables (NEVER commit)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.staging
+
+# IDE / Editor (project-specific)
+.vscode/settings.json
+.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+
+# OS / Temp files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.Thumbs.db
+
+# Certificates & Keys (SENSITIVE)
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# Coverage & Testing
+coverage/
+.nyc_output/
+.jest/
+
+# Uploads & Media (jangan commit foto bukti)
+public/uploads/*
+public/uploads/bukti/*
+public/uploads/temp/*
+!public/uploads/.gitkeep
+
+# Misc
+.cache/
+.temp/
+tmp/
+*.log
+.vscode/launch.json
