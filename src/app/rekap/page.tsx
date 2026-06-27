@@ -79,32 +79,24 @@ function RekapPageInner() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [filledDates, setFilledDates] = useState<string[]>([]);
 
-  // Get session and kelas list
+  // Get session for role detection
   useEffect(() => {
     (async () => {
       try {
-        const sessRes = await fetch('/api/auth/session');
-        const sessData = await sessRes.json();
-        setSession(sessData);
+        const res = await fetch('/api/auth/session');
+        if (res.ok) setSession(await res.json());
+      } catch { /* empty */ }
+    })();
+  }, []);
 
-        // Guru: langsung pake kelasId dari API guru
-        if (sessData.role === 'GURU') {
-          const guruRes = await fetch('/api/guru/absensi');
-          if (guruRes.ok) {
-            const guruData = await guruRes.json();
-            if (guruData.kelas?.id) {
-              setKelas(guruData.kelas.id);
-              setHKelas(guruData.kelas.id);
-              setWaliKelas(guruData.kelas.waliKelas);
-            }
-          }
-        } else {
-          // Admin: fetch daftar kelas
-          const res = await fetch('/api/kelas');
-          const list = (await res.json()).kelas || [];
-          setKelasList(list);
-          if (list.length > 0) { setKelas(list[0].id); setWaliKelas(list[0].waliKelas); setHKelas(list[0].id); }
-        }
+  // Fetch kelas list (gak butuh session — langsung dari /api/kelas)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/kelas');
+        const list = (await res.json()).kelas || [];
+        setKelasList(list);
+        if (list.length > 0) { setKelas(list[0].id); setWaliKelas(list[0].waliKelas); setHKelas(list[0].id); }
       } catch { /* empty */ }
     })();
   }, []);

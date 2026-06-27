@@ -113,17 +113,17 @@ export default function LoginPage() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                       <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0Z" />
                       <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0Z" />
+                      <circle cx="12" cy="12" r="3" />
                       <path d="M3.933 13.909A4.75 4.75 0 0 0 17.49 15.6" />
                       <path d="M11.392 16.956a5.25 5.25 0 0 1-7.46-3.046" />
                       <path d="M3.513 10.09a4.75 4.75 0 0 1 13.577-1.71" />
                       <path d="M8.542 6.124a5.25 5.25 0 0 1 7.94 3.58" />
                       <path d="M21.647 10.273a.5.5 0 0 1-.089.726l-18 13.364a.5.5 0 0 1-.637-.074l-.932-1a.5.5 0 0 1 .088-.726l18-13.364a.5.5 0 0 1 .637.074Z" />
                       <path d="M2.353 13.727a.5.5 0 0 1 .089-.726l18-13.364a.5.5 0 0 1 .637.074l.932 1a.5.5 0 0 1-.088.726l-18 13.364a.5.5 0 0 1-.637-.074Z" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0Z" />
-                      <circle cx="12" cy="12" r="3" />
                     </svg>
                   )}
                 </button>
