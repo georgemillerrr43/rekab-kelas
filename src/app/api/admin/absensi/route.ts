@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { decryptSession } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { sendWhatsAppNotification } from '@/utils/waNotification';
 
 export async function GET(request: NextRequest) {
-  const sessionToken = request.cookies.get('session_token')?.value;
-  if (!sessionToken || !sessionToken.startsWith('ADMIN.')) {
+  const session = getSession(request);
+  if (!session || session.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 
@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const sessionToken = request.cookies.get('session_token')?.value;
-  if (!sessionToken || !sessionToken.startsWith('ADMIN.')) {
+  const session = getSession(request);
+  if (!session || session.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
   }
 

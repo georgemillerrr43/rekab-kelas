@@ -3,37 +3,40 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-interface Siswa {
-  id: string;
-  nis: string;
-  nama: string;
-  whatsappOrangTua: string;
-}
-
+interface Siswa { id: string; nis: string; nama: string; whatsappOrangTua: string; }
+interface Kelas { id: string; nama: string; waliKelas: string; }
 type StatusKehadiran = 'HADIR' | 'IZIN' | 'SAKIT' | 'ALPA';
-
-interface StudentAttendanceState {
-  siswaId: string;
-  status: StatusKehadiran;
-  alasan?: string;
-  buktiUrl?: string;
-  buktiPreview?: string;
-  uploadError?: string;
+interface StudentState {
+  siswaId: string; status: StatusKehadiran; alasan?: string;
+  buktiUrl?: string; buktiPreview?: string; uploadError?: string;
 }
 
 function AttendanceFormInner() {
   const searchParams = useSearchParams();
+  const [kelasList, setKelasList] = useState<Kelas[]>([]);
+  const [kelas, setKelas] = useState<string>(searchParams.get('kelas') || '');
   const [tanggal, setTanggal] = useState<string>(searchParams.get('tanggal') || new Date().toISOString().split('T')[0]);
-  const [kelas, setKelas] = useState<string>(searchParams.get('kelas') || 'XI-RPL-1');
   const [students, setStudents] = useState<Siswa[]>([]);
-  const [attendance, setAttendance] = useState<Record<string, StudentAttendanceState>>({});
+  const [attendance, setAttendance] = useState<Record<string, StudentState>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
-    const fetchAttendanceData = async () => {
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/kelas');
+        const list = (await res.json()).kelas || [];
+        setKelasList(list);
+        if (list.length > 0 && !kelas) setKelas(list[0].id);
+      } catch { /* empty */ }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!kelas) return;
+    (async () => {
       setIsLoading(true);
       try {
         const res = await fetch(`/api/admin/absensi?kelas=${kelas}&tanggal=${tanggal}`);
@@ -41,423 +44,163 @@ function AttendanceFormInner() {
         const studentList = data.students || [];
         setStudents(studentList);
         setIsSuccess(!!data.alreadySubmitted);
-        
-        const initialAttendance: Record<string, StudentAttendanceState> = {};
-        studentList.forEach((s: any) => {
-          initialAttendance[s.id] = {
-            siswaId: s.id,
-            status: s.status,
-            alasan: s.alasan,
-            buktiUrl: s.buktiUrl,
-            buktiPreview: s.buktiUrl || '',
-            uploadError: '',
-          };
-        });
-        setAttendance(initialAttendance);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchAttendanceData();
+        const init: Record<string, StudentState> = {};
+        studentList.forEach((s: any) => { init[s.id] = { siswaId: s.id, status: s.status, alasan: s.alasan, buktiUrl: s.buktiUrl, buktiPreview: s.buktiUrl || '', uploadError: '' }; });
+        setAttendance(init);
+      } catch { /* empty */ } finally { setIsLoading(false); }
+    })();
   }, [kelas, tanggal]);
 
-  const handleStatusChange = (siswaId: string, status: StatusKehadiran) => {
-    setAttendance((prev) => ({
-      ...prev,
-      [siswaId]: {
-        ...prev[siswaId],
-        status,
-        ...(status === 'HADIR' || status === 'ALPA' 
-          ? { alasan: '', buktiUrl: '', buktiPreview: '', uploadError: '' } 
-          : {}),
-      },
-    }));
-  };
+  const handleStatus = (id: string, status: StatusKehadiran) => setAttendance((prev) => ({ ...prev, [id]: { ...prev[id], status, ...(status === 'HADIR' || status === 'ALPA' ? { alasan: '', buktiUrl: '', buktiPreview: '', uploadError: '' } : {}) } }));
+  const handleAlasan = (id: string, v: string) => setAttendance((prev) => ({ ...prev, [id]: { ...prev[id], alasan: v } }));
 
-  const handleAlasanChange = (siswaId: string, alasan: string) => {
-    setAttendance((prev) => ({
-      ...prev,
-      [siswaId]: {
-        ...prev[siswaId],
-        alasan,
-      },
-    }));
-  };
-
-  const handleFileUpload = (siswaId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type.startsWith('video/')) {
-      updateUploadError(siswaId, 'Format VIDEO dilarang! Harap unggah foto.');
-      e.target.value = '';
-      return;
-    }
-
-    if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
-      updateUploadError(siswaId, 'Hanya gambar JPEG/PNG yang diperbolehkan.');
-      e.target.value = '';
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      updateUploadError(siswaId, 'Ukuran file maksimal 2MB.');
-      e.target.value = '';
-      return;
-    }
-
+  const handleUpload = (siswaId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    if (file.type.startsWith('video/')) { updateErr(siswaId, 'Video dilarang!'); e.target.value = ''; return; }
+    if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) { updateErr(siswaId, 'Hanya JPEG/PNG!'); e.target.value = ''; return; }
+    if (file.size > 2 * 1024 * 1024) { updateErr(siswaId, 'Maksimal 2MB!'); e.target.value = ''; return; }
+    updateErr(siswaId, '');
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const fd = new FormData();
-      fd.append('file', file);
+      const fd = new FormData(); fd.append('file', file);
       try {
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: fd,
-        });
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: fd });
         const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) {
-          updateUploadError(siswaId, uploadData.error || 'Upload gagal');
-          return;
-        }
-
-        setAttendance((prev) => ({
-          ...prev,
-          [siswaId]: {
-            ...prev[siswaId],
-            buktiUrl: uploadData.url,
-            buktiPreview: reader.result as string,
-            uploadError: '',
-          },
-        }));
-      } catch (err) {
-        updateUploadError(siswaId, 'Gagal mengunggah file.');
-      }
+        if (!uploadRes.ok) { updateErr(siswaId, uploadData.error || 'Upload gagal'); return; }
+        setAttendance((prev) => ({ ...prev, [siswaId]: { ...prev[siswaId], buktiUrl: uploadData.url, buktiPreview: reader.result as string, uploadError: '' } }));
+      } catch { updateErr(siswaId, 'Gagal upload.'); }
     };
     reader.readAsDataURL(file);
   };
 
-  const updateUploadError = (siswaId: string, errorMsg: string) => {
-    setAttendance((prev) => ({
-      ...prev,
-      [siswaId]: {
-        ...prev[siswaId],
-        buktiUrl: '',
-        buktiPreview: '',
-        uploadError: errorMsg,
-      },
-    }));
-  };
+  const updateErr = (id: string, msg: string) => setAttendance((prev) => ({ ...prev, [id]: { ...prev[id], buktiUrl: '', buktiPreview: '', uploadError: msg } }));
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitMessage(null);
-
-    let hasValidationError = false;
-    const currentAttendance = { ...attendance };
-
-    for (const student of students) {
-      const state = currentAttendance[student.id];
-      if (state.status === 'IZIN' || state.status === 'SAKIT') {
-        if (!state.alasan?.trim()) {
-          state.uploadError = 'Alasan ketidakhadiran wajib diisi!';
-          hasValidationError = true;
-        }
-        if (!state.buktiUrl) {
-          state.uploadError = state.uploadError 
-            ? `${state.uploadError} Dan foto bukti wajib diunggah!`
-            : 'Foto bukti fisik wajib diunggah!';
-          hasValidationError = true;
-        }
+    e.preventDefault(); setIsSubmitting(true); setSubmitMessage(null);
+    let hasErr = false;
+    for (const s of students) {
+      const st = attendance[s.id];
+      if (st && (st.status === 'IZIN' || st.status === 'SAKIT')) {
+        if (!st.alasan?.trim()) { st.uploadError = 'Alasan wajib!'; hasErr = true; }
+        if (!st.buktiUrl) { st.uploadError = 'Foto bukti wajib!'; hasErr = true; }
       }
     }
-
-    if (hasValidationError) {
-      setAttendance(currentAttendance);
-      setSubmitMessage({
-        type: 'error',
-        text: 'Gagal menyimpan absensi. Silakan lengkapi alasan dan bukti untuk siswa yang Izin/Sakit.',
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
+    if (hasErr) { setAttendance({ ...attendance }); setSubmitMessage({ type: 'error', text: 'Lengkapi alasan dan bukti untuk Izin/Sakit.' }); setIsSubmitting(false); return; }
     try {
-      const payload = {
-        tanggal,
-        data: Object.values(attendance).map((item) => ({
-          siswaId: item.siswaId,
-          status: item.status,
-          alasan: item.alasan,
-          buktiUrl: item.buktiUrl,
-        })),
-      };
-
       const res = await fetch('/api/admin/absensi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tanggal, data: Object.values(attendance).map((i) => ({ siswaId: i.siswaId, status: i.status, alasan: i.alasan, buktiUrl: i.buktiUrl })) }),
       });
-
-      if (res.ok) {
-        setIsSuccess(true);
-      } else {
-        const resData = await res.json();
-        setSubmitMessage({
-          type: 'error',
-          text: resData.error || 'Gagal menyimpan absensi.',
-        });
-      }
-    } catch (error) {
-      setSubmitMessage({
-        type: 'error',
-        text: 'Terjadi kesalahan internal server.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+      if (res.ok) setIsSuccess(true);
+      else setSubmitMessage({ type: 'error', text: (await res.json()).error || 'Gagal.' });
+    } catch { setSubmitMessage({ type: 'error', text: 'Internal error.' }); }
+    setIsSubmitting(false);
   };
 
-  const renderDetailForm = (siswaId: string, state: StudentAttendanceState) => {
+  const renderDetail = (id: string, state: StudentState) => {
     if (state.status !== 'IZIN' && state.status !== 'SAKIT') return null;
-
     return (
-      <div className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-2 mt-2">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Alasan Ketidakhadiran *</label>
-          <input
-            type="text"
-            value={state.alasan || ''}
-            onChange={(e) => handleAlasanChange(siswaId, e.target.value)}
-            placeholder="Tulis alasan singkat..."
-            className="w-full p-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-800 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
-            required
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">
-            Unggah Bukti Foto (PNG/JPG, Maks. 2MB) *
-          </label>
-          <input
-            type="file"
-            accept="image/png, image/jpeg, image/jpg"
-            onChange={(e) => handleFileUpload(siswaId, e)}
-            className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-          />
-          {state.uploadError && (
-            <p className="text-[11px] font-medium text-rose-600 mt-1">{state.uploadError}</p>
-          )}
-        </div>
-
-        {state.buktiPreview && (
-          <div className="relative w-20 h-20 border border-slate-200 rounded-lg overflow-hidden mt-1 bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={state.buktiPreview} alt="Bukti upload preview" className="object-cover w-full h-full" />
-          </div>
-        )}
+      <div className="p-3 bg-[var(--bg-glass)] border border-[var(--border-subtle)] rounded-[var(--radius-card)] space-y-2 mt-2">
+        <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Alasan *</label><input type="text" value={state.alasan || ''} onChange={(e) => handleAlasan(id, e.target.value)} placeholder="Tulis alasan..." className="glass-input w-full p-2 text-xs" required /></div>
+        <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">Foto (PNG/JPG, Maks 2MB) *</label><input type="file" accept="image/png, image/jpeg, image/jpg" onChange={(e) => handleUpload(id, e)} className="w-full text-xs text-[var(--text-muted)] file:mr-2 file:py-1 file:px-3 file:rounded-[var(--radius-pill)] file:border-0 file:text-xs file:font-semibold file:bg-[rgba(99,102,241,0.1)] file:text-[var(--brand)] hover:file:bg-[rgba(99,102,241,0.15)] cursor-pointer" />{state.uploadError && <p className="text-[11px] font-medium text-[var(--bearish)] mt-1">{state.uploadError}</p>}</div>
+        {state.buktiPreview && <div className="relative w-20 h-20 border border-[var(--border-default)] rounded-[var(--radius-card)] overflow-hidden mt-1"><img src={state.buktiPreview} alt="Preview" className="object-cover w-full h-full" /></div>}
       </div>
     );
   };
 
-  if (isLoading) {
+  const btnRow = (id: string, state: StudentState) => {
+    const btns = [
+      { label: 'Hadir', val: 'HADIR' as const, a: 'bg-[var(--bullish)] text-white', b: 'text-[var(--bullish)] border-[rgba(34,197,94,0.2)]' },
+      { label: 'Izin', val: 'IZIN' as const, a: 'bg-[var(--warning)] text-white', b: 'text-[var(--warning)] border-[rgba(245,158,11,0.2)]' },
+      { label: 'Sakit', val: 'SAKIT' as const, a: 'bg-[var(--info)] text-white', b: 'text-[var(--info)] border-[rgba(6,182,212,0.2)]' },
+      { label: 'Alpa', val: 'ALPA' as const, a: 'bg-[var(--bearish)] text-white', b: 'text-[var(--bearish)] border-[rgba(239,68,68,0.2)]' },
+    ];
+    return btns.map((b) => (<button key={b.val} type="button" onClick={() => handleStatus(id, b.val)} className={`btn-pill-sm ${state.status === b.val ? b.a : `${b.b} hover:bg-[var(--bg-glass-hover)]`}`}>{b.label}</button>));
+  };
+
+  const btnRowMobile = (id: string, state: StudentState) => {
+    const btns = [
+      { label: 'Hadir', val: 'HADIR' as const, a: 'bg-[var(--bullish)] text-white', b: 'text-[var(--bullish)] border-[rgba(34,197,94,0.2)] bg-[rgba(34,197,94,0.05)]' },
+      { label: 'Izin', val: 'IZIN' as const, a: 'bg-[var(--warning)] text-white', b: 'text-[var(--warning)] border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.05)]' },
+      { label: 'Sakit', val: 'SAKIT' as const, a: 'bg-[var(--info)] text-white', b: 'text-[var(--info)] border-[rgba(6,182,212,0.2)] bg-[rgba(6,182,212,0.05)]' },
+      { label: 'Alpa', val: 'ALPA' as const, a: 'bg-[var(--bearish)] text-white', b: 'text-[var(--bearish)] border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.05)]' },
+    ];
+    return btns.map((b) => (<button key={b.val} type="button" onClick={() => handleStatus(id, b.val)} className={`py-2.5 text-center text-xs font-semibold rounded-[var(--radius-pill)] border transition-all ${state.status === b.val ? b.a : b.b}`}>{b.label}</button>));
+  };
+
+  if (isLoading && kelas) return <div className="glass-card max-w-5xl mx-auto p-6 text-center py-20 text-[var(--text-muted)] font-semibold">Memuat data absensi...</div>;
+
+  if (!kelas) {
     return (
-      <div className="max-w-5xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-xl border border-slate-100 text-center py-20 text-slate-400 font-semibold">
-        Memuat data absensi...
+      <div className="glass-card max-w-5xl mx-auto p-6">
+        <div className="text-center py-12">
+          <div className="w-16 h-16 rounded-[var(--radius-pill)] bg-[var(--bg-glass)] flex items-center justify-center mx-auto mb-4"><svg className="w-8 h-8 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg></div>
+          <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Pilih Kelas Terlebih Dahulu</h3>
+          <p className="text-[var(--text-muted)] text-sm">Silakan pilih kelas untuk memulai input absensi.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-[var(--bg-glass)] p-4 rounded-[var(--radius-card)]">
+          <div><label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">Tanggal</label><input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className="glass-input w-full p-2.5 text-sm" /></div>
+          <div><label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">Kelas</label><select value={kelas} onChange={(e) => setKelas(e.target.value)} className="glass-select w-full p-2.5 text-sm"><option value="">-- Pilih --</option>{kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama} ({k.waliKelas})</option>))}</select></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-6 bg-white rounded-2xl shadow-xl border border-slate-100">
-      <div className="border-b border-slate-100 pb-5 mb-6">
-        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Form Absensi Harian Kelas</h2>
-        <p className="text-slate-500 text-sm">Catat kehadiran siswa secara akurat setelah kelas selesai.</p>
+    <div className="glass-card max-w-5xl mx-auto p-4 md:p-6">
+      <div className="border-b border-[var(--border-subtle)] pb-5 mb-6">
+        <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Form Absensi Harian</h2>
+        <p className="text-[var(--text-muted)] text-sm">Catat kehadiran siswa secara akurat setelah kelas selesai.</p>
       </div>
 
-      {/* Date & Class Selectors (Always Visible) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl mb-6">
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Tanggal Absensi</label>
-          <input
-            type="date"
-            value={tanggal}
-            onChange={(e) => setTanggal(e.target.value)}
-            className="w-full p-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Kelas</label>
-          <select
-            value={kelas}
-            onChange={(e) => setKelas(e.target.value)}
-            className="w-full p-2.5 rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none text-sm transition-all"
-          >
-            <option value="XI-RPL-1">XI RPL 1</option>
-            <option value="XI-RPL-2">XI RPL 2</option>
-            <option value="XII-RPL-1">XII RPL 1</option>
-          </select>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-[var(--bg-glass)] p-4 rounded-[var(--radius-card)] mb-6">
+        <div><label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">Tanggal</label><input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className="glass-input w-full p-2.5 text-sm" /></div>
+        <div><label className="block text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-1">Kelas</label><select value={kelas} onChange={(e) => setKelas(e.target.value)} className="glass-select w-full p-2.5 text-sm">{kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama} ({k.waliKelas})</option>))}</select></div>
       </div>
 
       {isSuccess ? (
-        <div className="max-w-2xl mx-auto mt-6 p-8 md:p-12 bg-white rounded-2xl border border-slate-100 shadow-sm text-center relative overflow-hidden animate-in fade-in zoom-in duration-500">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-40 bg-gradient-to-b from-emerald-50 to-transparent -z-10" />
-          
-          <div className="w-20 h-20 bg-gradient-to-tr from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-200/50 ring-8 ring-emerald-50">
-            <svg className="w-10 h-10 text-white drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          
-          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight mb-2">
-            Rekap kehadiran hari ini sudah dikirim
-          </h2>
-          <p className="text-slate-500 text-base mb-8 font-medium">
-            Data absensi kelas <span className="text-slate-800 font-semibold">{kelas}</span> pada tanggal <span className="text-slate-800 font-semibold">{tanggal}</span> telah tersimpan di sistem.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setIsSuccess(false)}
-              className="w-full sm:w-auto px-6 py-2.5 bg-white border-2 border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all shadow-sm outline-none"
-            >
-              Kembali Edit
-            </button>
-            <a
-              href="/rekap"
-              className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-bold rounded-xl hover:from-indigo-700 hover:to-indigo-800 transition-all shadow-lg shadow-indigo-100 hover:shadow-indigo-200 outline-none block"
-            >
-              Lihat Rekap
-            </a>
+        <div className="max-w-2xl mx-auto mt-6 p-8 md:p-12 glass-card text-center">
+          <div className="w-20 h-20 bg-gradient-to-tr from-[var(--bullish)] to-emerald-400 rounded-[var(--radius-pill)] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-[var(--bullish)]/20 ring-8 ring-[rgba(34,197,94,0.1)]"><svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg></div>
+          <h2 className="text-2xl font-extrabold text-[var(--text-primary)] mb-2">Rekap hari ini sudah dikirim</h2>
+          <p className="text-[var(--text-muted)] text-base mb-8 font-medium">Kelas <span className="text-[var(--text-primary)] font-semibold">{kelas.replace(/-/g, ' ')}</span> - {tanggal}</p>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <button type="button" onClick={() => setIsSuccess(false)} className="btn btn-secondary px-6 py-2.5 text-sm font-bold">Kembali Edit</button>
+            <a href="/rekap" className="btn-primary px-6 py-2.5 text-sm font-bold">Lihat Rekap</a>
           </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">
-          {submitMessage && (
-            <div className={`p-4 rounded-xl text-sm ${
-              submitMessage.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
-            }`}>
-              {submitMessage.text}
-            </div>
+          {submitMessage && <div className={`p-4 rounded-[var(--radius-input)] text-sm ${submitMessage.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>{submitMessage.text}</div>}
+
+          <h3 className="text-base font-bold text-[var(--text-primary)]">Daftar Kehadiran Siswa</h3>
+
+          {students.length === 0 ? (
+            <div className="text-center py-10 text-[var(--text-muted)] font-semibold">Belum ada data siswa.</div>
+          ) : (
+            <>
+              <div className="hidden md:block overflow-hidden glass rounded-[var(--radius-card)]">
+                <table className="table-premium">
+                  <thead><tr><th className="text-center w-1/12">NIS</th><th className="w-3/12">Nama</th><th className="text-center w-4/12">Kehadiran</th><th className="w-4/12">Keterangan</th></tr></thead>
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
+                    {students.map((s) => {
+                      const state = attendance[s.id] || { status: 'HADIR' as const };
+                      return (<tr key={s.id} className="hover:bg-[var(--bg-glass)] transition-colors"><td className="text-center font-mono">{s.nis}</td><td><p className="font-semibold text-[var(--text-primary)] text-sm">{s.nama}</p><p className="text-[var(--text-muted)] text-xs">WA: {s.whatsappOrangTua}</p></td><td><div className="flex justify-center gap-1.5">{btnRow(s.id, state)}</div></td><td>{renderDetail(s.id, state)}</td></tr>);
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden space-y-4">
+                {students.map((s) => {
+                  const state = attendance[s.id] || { status: 'HADIR' as const };
+                  return (<div key={s.id} className="p-4 glass rounded-[var(--radius-card)] space-y-3"><div className="flex justify-between items-start"><div><p className="font-bold text-[var(--text-primary)] text-sm">{s.nama}</p><p className="text-[var(--text-muted)] text-xs">NIS: {s.nis}</p></div></div><div className="grid grid-cols-4 gap-1.5">{btnRowMobile(s.id, state)}</div>{renderDetail(s.id, state)}</div>);
+                })}
+              </div>
+            </>
           )}
 
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-800">Daftar Kehadiran Siswa</h3>
-            
-            {students.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 font-semibold">Belum ada data siswa di kelas ini.</div>
-            ) : (
-              <>
-                <div className="hidden md:block overflow-hidden border border-slate-100 rounded-xl">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-100 border-b border-slate-200">
-                        <th className="p-3 text-xs font-bold text-slate-700 uppercase tracking-wider w-1/12 text-center">NIS</th>
-                        <th className="p-3 text-xs font-bold text-slate-700 uppercase tracking-wider w-3/12">Nama Siswa</th>
-                        <th className="p-3 text-xs font-bold text-slate-700 uppercase tracking-wider w-4/12 text-center">Opsi Kehadiran</th>
-                        <th className="p-3 text-xs font-bold text-slate-700 uppercase tracking-wider w-4/12">Keterangan Izin/Sakit</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {students.map((siswa) => {
-                        const state = attendance[siswa.id] || { status: 'HADIR' };
-                        return (
-                          <tr key={siswa.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="p-3 text-sm text-slate-600 text-center font-mono">{siswa.nis}</td>
-                            <td className="p-3">
-                              <p className="font-semibold text-slate-800 text-sm">{siswa.nama}</p>
-                              <p className="text-slate-400 text-xs">WA Wali: {siswa.whatsappOrangTua}</p>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex justify-center gap-1.5">
-                                {([
-                                  { label: 'Hadir', val: 'HADIR', activeClass: 'bg-emerald-600 text-white shadow-md shadow-emerald-200', baseClass: 'hover:bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300' },
-                                  { label: 'Izin', val: 'IZIN', activeClass: 'bg-amber-500 text-white shadow-md shadow-amber-200', baseClass: 'hover:bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-300' },
-                                  { label: 'Sakit', val: 'SAKIT', activeClass: 'bg-sky-500 text-white shadow-md shadow-sky-200', baseClass: 'hover:bg-sky-50 text-sky-700 border-sky-200 hover:border-sky-300' },
-                                  { label: 'Alpa', val: 'ALPA', activeClass: 'bg-rose-600 text-white shadow-md shadow-rose-200', baseClass: 'hover:bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-300' }
-                                ] as const).map((btn) => (
-                                  <button
-                                    key={btn.val}
-                                    type="button"
-                                    onClick={() => handleStatusChange(siswa.id, btn.val)}
-                                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                                      state.status === btn.val ? btn.activeClass : `bg-white ${btn.baseClass}`
-                                    }`}
-                                  >
-                                    {btn.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              {renderDetailForm(siswa.id, state)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="md:hidden space-y-4">
-                  {students.map((siswa) => {
-                    const state = attendance[siswa.id] || { status: 'HADIR' };
-                    return (
-                      <div key={siswa.id} className="p-4 border border-slate-150 rounded-xl space-y-3 bg-white hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-bold text-slate-800 text-sm">{siswa.nama}</p>
-                            <p className="text-slate-400 text-xs">NIS: {siswa.nis} | WA: {siswa.whatsappOrangTua}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-4 gap-1">
-                          {([
-                            { label: 'Hadir', val: 'HADIR', activeClass: 'bg-emerald-600 text-white', baseClass: 'text-emerald-700 border-emerald-100 bg-emerald-50/30' },
-                            { label: 'Izin', val: 'IZIN', activeClass: 'bg-amber-500 text-white', baseClass: 'text-amber-700 border-amber-100 bg-amber-50/30' },
-                            { label: 'Sakit', val: 'SAKIT', activeClass: 'bg-sky-500 text-white', baseClass: 'text-sky-700 border-sky-100 bg-sky-50/30' },
-                            { label: 'Alpa', val: 'ALPA', activeClass: 'bg-rose-600 text-white', baseClass: 'text-rose-700 border-rose-100 bg-rose-50/30' }
-                          ] as const).map((btn) => (
-                            <button
-                              key={btn.val}
-                              type="button"
-                              onClick={() => handleStatusChange(siswa.id, btn.val)}
-                              className={`py-2 text-center text-xs font-semibold rounded-lg border transition-all ${
-                                state.status === btn.val ? btn.activeClass : `bg-white ${btn.baseClass}`
-                              }`}
-                            >
-                              {btn.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        {renderDetailForm(siswa.id, state)}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button
-              type="submit"
-              disabled={isSubmitting || isLoading}
-              className={`px-6 py-3 text-sm font-semibold text-white rounded-xl shadow-lg transition-all ${
-                isSubmitting || isLoading
-                  ? 'bg-indigo-400 cursor-not-allowed' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-150 active:scale-95'
-              }`}
-            >
-              {isSubmitting ? 'Menyimpan Absensi...' : 'Simpan & Kirim Absensi'}
-            </button>
+          <div className="flex justify-end pt-4 border-t border-[var(--border-subtle)]">
+            <button type="submit" disabled={isSubmitting || isLoading} className="btn-primary px-8 py-2.5 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed">{isSubmitting ? 'Menyimpan...' : 'Simpan dan Kirim'}</button>
           </div>
         </form>
       )}
@@ -466,9 +209,5 @@ function AttendanceFormInner() {
 }
 
 export default function AttendanceForm() {
-  return (
-    <Suspense fallback={<div className="max-w-5xl mx-auto p-10 text-center text-slate-500 font-medium">Memuat form...</div>}>
-      <AttendanceFormInner />
-    </Suspense>
-  );
+  return (<Suspense fallback={<div className="glass-card max-w-5xl mx-auto p-10 text-center text-[var(--text-muted)] font-medium">Memuat form...</div>}><AttendanceFormInner /></Suspense>);
 }

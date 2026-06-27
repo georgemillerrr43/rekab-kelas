@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { decryptSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   const sessionToken = request.cookies.get('session_token')?.value;
@@ -6,9 +7,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ isLoggedIn: false, role: null });
   }
 
-  const rolePrefix = sessionToken.split('.')[0];
-  if (rolePrefix === 'ADMIN' || rolePrefix === 'SISWA') {
-    return NextResponse.json({ isLoggedIn: true, role: rolePrefix });
+  const session = decryptSession(sessionToken);
+  if (session) {
+    return NextResponse.json({ isLoggedIn: true, role: session.role, nama: session.nama });
   }
 
   return NextResponse.json({ isLoggedIn: false, role: null });

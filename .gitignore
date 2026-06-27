@@ -61,6 +61,10 @@ public/uploads/bukti/*
 public/uploads/temp/*
 !public/uploads/.gitkeep
 
+# Claude AI & Agents (Personal)
+.claude/
+.agents/
+
 # Misc
 .cache/
 .temp/

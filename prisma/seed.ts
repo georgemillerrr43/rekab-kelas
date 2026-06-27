@@ -1,10 +1,11 @@
 import { PrismaClient } from '@prisma/client';
-import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
+const BCRYPT_ROUNDS = 12;
 
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
 const dataKelas = [
@@ -36,10 +37,11 @@ async function main() {
   console.log('✅ Database cleaned');
 
   console.log('\n👤 Membuat akun Admin default...');
+  const adminPassword = await hashPassword('admin123');
   await prisma.admin.create({
     data: {
       username: 'admin',
-      password: hashPassword('admin123'),
+      password: adminPassword,
       nama: 'Budi Setiawan, S.Pd.',
     },
   });
@@ -66,6 +68,7 @@ async function main() {
       continue;
     }
 
+    const siswaPassword = await hashPassword('siswa123');
     await prisma.siswa.create({
       data: {
         nis: siswa.nis,
@@ -73,7 +76,7 @@ async function main() {
         kelasId: kelasId,
         whatsappOrangTua: siswa.whatsappOrangTua,
         username: siswa.nis,
-        password: hashPassword('siswa123'),
+        password: siswaPassword,
       },
     });
     console.log(`  ✓ ${siswa.nis} - ${siswa.nama} (${siswa.kelas})`);

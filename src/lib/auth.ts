@@ -1,20 +1,27 @@
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 
 const SECRET_KEY = process.env.JWT_SECRET || 'super-secret-key-rekap-kelas-9876543210-security';
 const SESSION_COOKIE_NAME = 'session_token';
+const BCRYPT_ROUNDS = 12; // Security vs performance balance
 
 export interface SessionData {
   userId: string;
   username: string;
-  role: 'ADMIN' | 'SISWA';
+  role: 'ADMIN' | 'GURU' | 'SISWA';
   nama: string;
   nis?: string;
 }
 
-// 1. Hash Password menggunakan SHA-256
-export function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+// 1. Hash Password menggunakan bcrypt (secure with salt)
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+// 2. Compare Password dengan hashed password
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
 }
 
 // 2. Enkripsi Session Data menggunakan AES-256-CBC

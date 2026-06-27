@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hashPassword, decryptSession } from '@/lib/auth';
+import { hashPassword, getSession } from '@/lib/auth';
 
 // Endpoint: GET /api/admin/siswa - Ambil daftar semua siswa
 export async function GET(request: NextRequest) {
-  const sessionToken = request.cookies.get('session_token')?.value;
-  if (!sessionToken || !sessionToken.startsWith('ADMIN.')) {
+  const session = getSession(request);
+  if (!session || session.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Akses ditolak. Hanya Admin.' }, { status: 403 });
   }
 
@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const sessionToken = request.cookies.get('session_token')?.value;
-  if (!sessionToken || !sessionToken.startsWith('ADMIN.')) {
+  const session = getSession(request);
+  if (!session || session.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Akses ditolak. Hanya Admin.' }, { status: 403 });
   }
 
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         nama,
         kelasId,
         username,
-        password: hashPassword(password),
+        password: await hashPassword(password),
         whatsappOrangTua: whatsappOrangTua || '',
       },
       include: {
@@ -103,12 +103,22 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Akses ditolak. Hanya Admin.' }, { status: 403 });
   }
 
+  const session = getSession(request);
+  if (!session || session.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Akses ditolak. Hanya Admin.' }, { status: 403 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
     if (!id) {
       return NextResponse.json({ error: 'ID siswa wajib disertakan.' }, { status: 400 });
+    }
+
+    const existing = await prisma.siswa.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Siswa tidak ditemukan.' }, { status: 404 });
     }
 
     await prisma.siswa.delete({ where: { id } });

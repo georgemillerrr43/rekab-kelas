@@ -29,10 +29,22 @@ model Admin {
   updatedAt DateTime @updatedAt
 }
 
+model Guru {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String   // Hashed password
+  nama      String
+  kelasId   String   @unique
+  kelas     Kelas    @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Kelas {
   id         String   @id @default(uuid())
   nama       String   @unique // e.g., "XI-RPL-1"
   waliKelas  String   // Nama guru/wali kelas/penanda tangan
+  guru       Guru?    // Relasi one-to-one ke Guru (opsional untuk kelas legacy)
   siswa      Siswa[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -42,7 +54,7 @@ model Siswa {
   id               String      @id @default(uuid())
   nis              String      @unique
   nama             String
-  kelasId          String      @default("default-kelas-id")
+  kelasId          String      // ✅ No default - must be explicit
   kelas            Kelas       @relation(fields: [kelasId], references: [id], onDelete: Cascade)
   whatsappOrangTua String
   username         String      @unique

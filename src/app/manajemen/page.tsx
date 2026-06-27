@@ -3,30 +3,61 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface KelasItem {
-  id: string;
-  nama: string;
-  waliKelas: string;
-  _count: {
-    siswa: number;
-  };
+interface KelasItem { id: string; nama: string; waliKelas: string; _count: { siswa: number }; }
+interface SiswaItem { id: string; nis: string; nama: string; username: string; whatsappOrangTua: string; kelasId: string; kelas: { id: string; nama: string; waliKelas: string }; }
+
+type TabType = 'kelas' | 'guru' | 'siswa';
+
+// -- Modal Component --
+function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+  useEffect(() => {
+    if (open) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-subtle)]">
+          <h3 className="font-bold text-[var(--text-primary)] text-base">{title}</h3>
+          <button onClick={onClose} className="btn-ghost w-8 h-8 rounded-[var(--radius-pill)] grid place-items-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="px-6 py-5">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-interface SiswaItem {
-  id: string;
-  nis: string;
-  nama: string;
-  username: string;
-  whatsappOrangTua: string;
-  kelasId: string;
-  kelas: {
-    id: string;
-    nama: string;
-    waliKelas: string;
-  };
+// -- Confirm Modal --
+function ConfirmModal({ open, title, message, confirmLabel, loading, onConfirm, onCancel }: {
+  open: boolean; title: string; message: string; confirmLabel: string; loading?: boolean; onConfirm: () => void; onCancel: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="modal-panel max-w-sm" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-6 text-center">
+          <div className="w-12 h-12 rounded-full bg-[rgba(239,68,68,0.12)] flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="var(--bearish)" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+          </div>
+          <h3 className="font-bold text-[var(--text-primary)] text-base mb-2">{title}</h3>
+          <p className="text-sm text-[var(--text-secondary)] mb-6">{message}</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={onCancel} className="btn btn-secondary px-5 py-2 text-sm">Batal</button>
+            <button onClick={onConfirm} disabled={loading} className="px-5 py-2 text-sm font-bold rounded-[var(--radius-pill)] bg-[var(--bearish)] text-white hover:opacity-90 transition-all disabled:opacity-40">{loading ? 'Memproses...' : confirmLabel}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
-
-type TabType = 'kelas' | 'siswa';
 
 export default function ManagementPage() {
   const router = useRouter();
@@ -35,284 +66,195 @@ export default function ManagementPage() {
   // Kelas state
   const [kelasList, setKelasList] = useState<KelasItem[]>([]);
   const [kelasLoading, setKelasLoading] = useState(false);
-  const [showAddKelasForm, setShowAddKelasForm] = useState(false);
+  const [showAddKelas, setShowAddKelas] = useState(false);
   const [addKelasLoading, setAddKelasLoading] = useState(false);
   const [kelasMsg, setKelasMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [newKelasNama, setNewKelasNama] = useState('');
-  const [newWaliKelas, setNewWaliKelas] = useState('');
+  const [newKNama, setNewKNama] = useState('');
+  const [newWKelas, setNewWKelas] = useState('');
+  const [guruUsername, setGuruUsername] = useState('');
+  const [guruPassword, setGuruPassword] = useState('');
+  const [editKelas, setEditKelas] = useState<{ id: string; nama: string; waliKelas: string } | null>(null);
+  const [editKNama, setEditKNama] = useState('');
+  const [editWKelas, setEditWKelas] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; nama: string; type: 'kelas' | 'guru' | 'siswa' } | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Guru state
+  const [guruList, setGuruList] = useState<any[]>([]);
+  const [guruLoading, setGuruLoading] = useState(false);
+  const [guruMsg, setGuruMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Siswa state
   const [siswaList, setSiswaList] = useState<SiswaItem[]>([]);
   const [siswaLoading, setSiswaLoading] = useState(false);
-  const [showAddSiswaForm, setShowAddSiswaForm] = useState(false);
+  const [showAddSiswa, setShowAddSiswa] = useState(false);
   const [addSiswaLoading, setAddSiswaLoading] = useState(false);
   const [siswaMsg, setSiswaMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [filterKelas, setFilterKelas] = useState<string>('all');
-  const [newNis, setNewNis] = useState('');
-  const [newNama, setNewNama] = useState('');
-  const [newKelasId, setNewKelasId] = useState('');
-  const [newUsername, setNewUsername] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newWa, setNewWa] = useState('');
+  const [fNis, setFNis] = useState(''); const [fNama, setFNama] = useState('');
+  const [fKelasId, setFKelasId] = useState(''); const [fUsername, setFUsername] = useState('');
+  const [fPassword, setFPassword] = useState(''); const [fWa, setFWa] = useState('');
 
   useEffect(() => {
-    if (activeTab === 'kelas') {
-      fetchKelas();
-    } else if (activeTab === 'siswa') {
-      fetchKelas(); // Need class list for dropdown
-      fetchSiswa();
-    }
+    if (activeTab === 'kelas') fetchKelas();
+    else if (activeTab === 'guru') fetchGuru();
+    else { fetchKelas(); fetchSiswa(); }
   }, [activeTab]);
 
+  const fetchGuru = async () => {
+    setGuruLoading(true);
+    try {
+      const res = await fetch('/api/admin/guru');
+      if (res.status === 403) { router.push('/login'); return; }
+      setGuruList((await res.json()).guru || []);
+    } catch { /* ignore */ } finally { setGuruLoading(false); }
+  };
   const fetchKelas = async () => {
     setKelasLoading(true);
     try {
       const res = await fetch('/api/admin/kelas');
       if (res.status === 403) { router.push('/login'); return; }
-      const data = await res.json();
-      setKelasList(data.kelas || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setKelasLoading(false);
-    }
+      setKelasList((await res.json()).kelas || []);
+    } catch { /* ignore */ } finally { setKelasLoading(false); }
   };
-
   const fetchSiswa = async () => {
     setSiswaLoading(true);
     try {
       const res = await fetch('/api/admin/siswa');
       if (res.status === 403) { router.push('/login'); return; }
-      const data = await res.json();
-      setSiswaList(data.students || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSiswaLoading(false);
-    }
+      setSiswaList((await res.json()).students || []);
+    } catch { /* ignore */ } finally { setSiswaLoading(false); }
   };
 
   const handleAddKelas = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAddKelasLoading(true);
-    setKelasMsg(null);
-
+    e.preventDefault(); setAddKelasLoading(true); setKelasMsg(null);
     const res = await fetch('/api/admin/kelas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nama: newKelasNama, waliKelas: newWaliKelas }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nama: newKNama, waliKelas: newWKelas, guruUsername: guruUsername || undefined, guruPassword: guruPassword || undefined }),
     });
-
     const data = await res.json();
-
-    if (!res.ok) {
-      setKelasMsg({ type: 'error', text: data.error });
-    } else {
-      setKelasMsg({ type: 'success', text: `Kelas "${newKelasNama}" berhasil ditambahkan!` });
-      setNewKelasNama('');
-      setNewWaliKelas('');
-      setShowAddKelasForm(false);
-      fetchKelas();
-    }
-
-    setAddKelasLoading(false);
-    setTimeout(() => setKelasMsg(null), 5000);
+    if (!res.ok) setKelasMsg({ type: 'error', text: data.error });
+    else { setKelasMsg({ type: 'success', text: `Kelas "${newKNama}" berhasil ditambahkan!` }); setNewKNama(''); setNewWKelas(''); setGuruUsername(''); setGuruPassword(''); setShowAddKelas(false); fetchKelas(); }
+    setAddKelasLoading(false); setTimeout(() => setKelasMsg(null), 5000);
   };
 
-  const handleDeleteKelas = async (id: string, nama: string) => {
-    if (!confirm(`Yakin ingin menghapus kelas "${nama}"?`)) return;
+  const handleDeleteKelas = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    const res = await fetch(`/api/admin/kelas?id=${deleteTarget.id}`, { method: 'DELETE' });
+    if (res.ok) { setKelasMsg({ type: 'success', text: `"${deleteTarget.nama}" dihapus.` }); fetchKelas(); }
+    else setKelasMsg({ type: 'error', text: 'Gagal menghapus.' });
+    setDeleteLoading(false); setDeleteTarget(null); setTimeout(() => setKelasMsg(null), 4000);
+  };
 
-    const res = await fetch(`/api/admin/kelas?id=${id}`, { method: 'DELETE' });
+  const handleDeleteGuru = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    const res = await fetch(`/api/admin/guru?id=${deleteTarget.id}`, { method: 'DELETE' });
+    if (res.ok) { setGuruMsg({ type: 'success', text: `Guru "${deleteTarget.nama}" dihapus.` }); fetchGuru(); }
+    else setGuruMsg({ type: 'error', text: 'Gagal.' });
+    setDeleteLoading(false); setDeleteTarget(null); setTimeout(() => setGuruMsg(null), 4000);
+  };
 
-    if (res.ok) {
-      setKelasMsg({ type: 'success', text: `Kelas "${nama}" berhasil dihapus.` });
-      fetchKelas();
-    } else {
-      const data = await res.json();
-      setKelasMsg({ type: 'error', text: data.error || 'Gagal menghapus kelas.' });
-    }
+  const handleDeleteSiswa = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    const res = await fetch(`/api/admin/siswa?id=${deleteTarget.id}`, { method: 'DELETE' });
+    if (res.ok) { setSiswaMsg({ type: 'success', text: `"${deleteTarget.nama}" dihapus.` }); fetchSiswa(); }
+    else setSiswaMsg({ type: 'error', text: 'Gagal.' });
+    setDeleteLoading(false); setDeleteTarget(null); setTimeout(() => setSiswaMsg(null), 4000);
+  };
 
-    setTimeout(() => setKelasMsg(null), 4000);
+  const startEditKelas = (k: { id: string; nama: string; waliKelas: string }) => {
+    setEditKelas(k); setEditKNama(k.nama); setEditWKelas(k.waliKelas);
+  };
+
+  const handleEditKelas = async (e: React.FormEvent) => {
+    e.preventDefault(); setEditLoading(true); setKelasMsg(null);
+    const res = await fetch('/api/admin/kelas', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: editKelas!.id, nama: editKNama, waliKelas: editWKelas }),
+    });
+    const data = await res.json();
+    if (!res.ok) setKelasMsg({ type: 'error', text: data.error });
+    else { setKelasMsg({ type: 'success', text: `Kelas "${editKNama}" berhasil diperbarui!` }); setEditKelas(null); fetchKelas(); }
+    setEditLoading(false); setTimeout(() => setKelasMsg(null), 5000);
   };
 
   const handleAddSiswa = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAddSiswaLoading(true);
-    setSiswaMsg(null);
-
+    e.preventDefault(); setAddSiswaLoading(true); setSiswaMsg(null);
     const res = await fetch('/api/admin/siswa', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nis: newNis,
-        nama: newNama,
-        kelasId: newKelasId,
-        username: newUsername,
-        password: newPassword,
-        whatsappOrangTua: newWa
-      }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nis: fNis, nama: fNama, kelasId: fKelasId, username: fUsername, password: fPassword, whatsappOrangTua: fWa }),
     });
-
     const data = await res.json();
-
-    if (!res.ok) {
-      setSiswaMsg({ type: 'error', text: data.error });
-    } else {
-      setSiswaMsg({ type: 'success', text: `Akun "${newNama}" berhasil dibuat!` });
-      setNewNis('');
-      setNewNama('');
-      setNewKelasId('');
-      setNewUsername('');
-      setNewPassword('');
-      setNewWa('');
-      setShowAddSiswaForm(false);
-      fetchSiswa();
-    }
-
-    setAddSiswaLoading(false);
-    setTimeout(() => setSiswaMsg(null), 5000);
+    if (!res.ok) setSiswaMsg({ type: 'error', text: data.error });
+    else { setSiswaMsg({ type: 'success', text: `Akun "${fNama}" berhasil dibuat!` }); setFNis(''); setFNama(''); setFKelasId(''); setFUsername(''); setFPassword(''); setFWa(''); setShowAddSiswa(false); fetchSiswa(); }
+    setAddSiswaLoading(false); setTimeout(() => setSiswaMsg(null), 5000);
   };
 
-  const handleDeleteSiswa = async (id: string, nama: string) => {
-    if (!confirm(`Yakin ingin menghapus akun siswa "${nama}"?`)) return;
-
-    const res = await fetch(`/api/admin/siswa?id=${id}`, { method: 'DELETE' });
-
-    if (res.ok) {
-      setSiswaMsg({ type: 'success', text: `Akun "${nama}" berhasil dihapus.` });
-      fetchSiswa();
-    } else {
-      const data = await res.json();
-      setSiswaMsg({ type: 'error', text: data.error || 'Gagal menghapus.' });
-    }
-
-    setTimeout(() => setSiswaMsg(null), 4000);
-  };
-
-  const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-  };
-
-  const filteredSiswa = filterKelas === 'all'
-    ? siswaList
-    : siswaList.filter(s => s.kelasId === filterKelas);
+  const filteredSiswa = filterKelas === 'all' ? siswaList : siswaList.filter(s => s.kelasId === filterKelas);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-indigo-900 via-indigo-800 to-violet-950 p-6 md:p-7 rounded-3xl text-white shadow-xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-violet-600/20 to-transparent pointer-events-none" />
-        <div className="relative z-10">
-          <span className="px-2.5 py-1 bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full text-xs font-bold uppercase tracking-wider">Manajemen</span>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-2">Kelola Kelas & Siswa</h1>
-          <p className="text-slate-300 text-sm">Tambahkan kelas dengan nama guru/wali kelas, dan kelola data siswa.</p>
-        </div>
-        <button onClick={handleLogout} className="relative z-10 inline-flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl border border-white/10 transition-all self-start">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
-          </svg>
-          Keluar
-        </button>
+    <div className="space-y-6">
+      <div className="page-header">
+        <span className="badge badge-gray mb-2">Manajemen</span>
+        <h1>Kelola Kelas dan Siswa</h1>
+        <p>Tambahkan kelas dengan nama guru atau wali kelas, dan kelola data siswa.</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
-        {(['kelas', 'siswa'] as const).map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`px-5 py-2.5 text-sm font-bold rounded-xl transition-all ${activeTab === tab ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-            {tab === 'kelas' ? 'Kelola Kelas' : 'Kelola Siswa'}
+      <div className="tab-switcher animate-fade-in">
+        {(['kelas', 'guru', 'siswa'] as const).map((tab) => (
+          <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'active' : ''}>
+            {tab === 'kelas' ? 'Kelas' : tab === 'guru' ? 'Guru' : 'Siswa'}
           </button>
         ))}
       </div>
 
-      {/* Kelas Tab */}
+      {/* ======== KELAS TAB ======== */}
       {activeTab === 'kelas' && (
-        <div className="space-y-5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="space-y-5 animate-fade-in">
+          <div className="glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-bold text-slate-800">Manajemen Kelas</h2>
-              <p className="text-slate-400 text-xs mt-0.5">Tambahkan kelas baru dengan nama guru/wali kelas. Nama guru tidak dapat diubah setelah dibuat.</p>
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Kelas</h2>
+              <p className="text-[var(--text-muted)] text-xs mt-0.5">Tambahkan kelas baru dengan nama guru / wali kelas.</p>
             </div>
-            <button onClick={() => setShowAddKelasForm(!showAddKelasForm)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition-all active:scale-95 self-start">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Tambah Kelas Baru
+            <button onClick={() => setShowAddKelas(true)} className="btn-primary px-5 py-2.5 text-sm font-bold">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              Tambah Kelas
             </button>
           </div>
 
           {kelasMsg && (
-            <div className={`p-4 rounded-xl text-sm font-semibold border ${kelasMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-              {kelasMsg.text}
-            </div>
+            <div className={`p-4 rounded-[var(--radius-input)] text-sm font-semibold border animate-slide-down ${kelasMsg.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>{kelasMsg.text}</div>
           )}
 
-          {showAddKelasForm && (
-            <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-sm">
-              <h3 className="text-base font-bold text-slate-800 mb-4 pb-3 border-b border-slate-100">Form Tambah Kelas Baru</h3>
-              <form onSubmit={handleAddKelas} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nama Kelas *</label>
-                    <input type="text" value={newKelasNama} onChange={(e) => setNewKelasNama(e.target.value)} required placeholder="Contoh: XI-RPL-1" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all" />
-                    <p className="text-xs text-slate-400 mt-1">Format: [Tingkat]-[Jurusan]-[Nomor]</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nama Guru / Wali Kelas *</label>
-                    <input type="text" value={newWaliKelas} onChange={(e) => setNewWaliKelas(e.target.value)} required placeholder="Contoh: Budi Santoso, S.Pd" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all" />
-                    <p className="text-xs text-slate-400 mt-1">Nama tidak dapat diubah setelah dibuat</p>
-                  </div>
-                </div>
-                <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
-                  <button type="button" onClick={() => setShowAddKelasForm(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Batal</button>
-                  <button type="submit" disabled={addKelasLoading} className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-all disabled:opacity-50 active:scale-95">
-                    {addKelasLoading ? 'Menyimpan...' : 'Simpan Kelas'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800">Daftar Kelas ({kelasList.length} kelas)</h3>
-              {kelasLoading && <span className="text-xs text-slate-400 animate-pulse">Memuat...</span>}
+          <div className="glass-card">
+            <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+              <h3 className="font-bold text-[var(--text-primary)]">Daftar Kelas ({kelasList.length})</h3>
+              {kelasLoading && <span className="text-xs text-[var(--text-muted)] animate-pulse">Memuat...</span>}
             </div>
             <div className="p-6">
               {kelasList.length === 0 && !kelasLoading ? (
-                <div className="text-center py-10 text-slate-400 text-sm">Belum ada kelas. Klik "Tambah Kelas Baru".</div>
+                <div className="text-center py-10 text-[var(--text-muted)] text-sm">Belum ada kelas.</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {kelasList.map((kelas) => (
-                    <div key={kelas.id} className="p-5 bg-gradient-to-br from-slate-50 to-indigo-50/30 border border-slate-200 rounded-xl hover:shadow-md transition-all">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 stagger-enter">
+                  {kelasList.map((k) => (
+                    <div key={k.id} className="p-5 glass border border-[var(--border-subtle)] rounded-[var(--radius-card)] hover:border-[var(--border-default)] hover:translate-y-[-2px] transition-all duration-300">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md">
-                            {kelas.nama.split('-')[0]}
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-slate-800 text-base">{kelas.nama.replace(/-/g, ' ')}</h4>
-                            <p className="text-xs text-slate-500">{kelas._count.siswa} siswa</p>
-                          </div>
+                          <div className="w-10 h-10 rounded-[var(--radius-card)] bg-gradient-to-br from-[var(--brand)] to-[#60a5fa] flex items-center justify-center text-white font-extrabold text-sm shadow-lg shadow-[var(--brand-glow)]">{k.nama.split('-')[0]}</div>
+                          <div><h4 className="font-bold text-[var(--text-primary)] text-sm">{k.nama.replace(/-/g, ' ')}</h4><p className="text-xs text-[var(--text-muted)]">{k._count.siswa} siswa</p></div>
                         </div>
                       </div>
-                      <div className="pt-3 border-t border-slate-200">
-                        <div className="flex items-center gap-2 mb-3">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-indigo-600">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                          </svg>
-                          <span className="text-xs font-semibold text-slate-600">Wali Kelas:</span>
+                      <div className="pt-3 border-t border-[var(--border-subtle)]">
+                        <p className="text-xs text-[var(--text-muted)] mb-1">Wali Kelas</p>
+                        <p className="text-sm font-bold text-[var(--text-primary)] mb-3">{k.waliKelas}</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => startEditKelas(k)} className="flex-1 py-1.5 text-xs font-bold rounded-[var(--radius-pill)] bg-[var(--bg-glass)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-glass-hover)] hover:text-[var(--text-primary)] transition-all">Edit</button>
+                          <button onClick={() => setDeleteTarget({ id: k.id, nama: k.nama, type: 'kelas' })} className="flex-1 py-1.5 text-xs font-bold btn-danger">Hapus</button>
                         </div>
-                        <p className="text-sm font-bold text-slate-800 mb-3">{kelas.waliKelas}</p>
-                        <button
-                          onClick={() => handleDeleteKelas(kelas.id, kelas.nama)}
-                          disabled={kelas._count.siswa > 0}
-                          className="w-full px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                          title={kelas._count.siswa > 0 ? 'Tidak dapat menghapus kelas yang memiliki siswa' : 'Hapus kelas'}>
-                          Hapus Kelas
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -323,123 +265,29 @@ export default function ManagementPage() {
         </div>
       )}
 
-      {/* Siswa Tab */}
-      {activeTab === 'siswa' && (
-        <div className="space-y-5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Manajemen Akun Siswa</h2>
-              <p className="text-slate-400 text-xs mt-0.5">Tambah, lihat, atau hapus akun siswa. Setiap siswa terhubung ke satu kelas.</p>
-            </div>
-            <button onClick={() => setShowAddSiswaForm(!showAddSiswaForm)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-md transition-all active:scale-95 self-start">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
-              </svg>
-              Tambah Siswa Baru
-            </button>
+      {/* ======== GURU TAB ======== */}
+      {activeTab === 'guru' && (
+        <div className="space-y-5 animate-fade-in">
+          <div className="glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div><h2 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Akun Guru</h2><p className="text-[var(--text-muted)] text-xs mt-0.5">Lihat dan hapus akun guru.</p></div>
           </div>
-
-          {/* Filter */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-            <label className="block text-xs font-semibold text-slate-600 mb-2">Filter berdasarkan Kelas</label>
-            <select value={filterKelas} onChange={(e) => setFilterKelas(e.target.value)}
-              className="w-full md:w-64 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 bg-white transition-all">
-              <option value="all">Semua Kelas</option>
-              {kelasList.map((k) => (
-                <option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>
-              ))}
-            </select>
-          </div>
-
-          {siswaMsg && (
-            <div className={`p-4 rounded-xl text-sm font-semibold border ${siswaMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-              {siswaMsg.text}
-            </div>
-          )}
-
-          {showAddSiswaForm && (
-            <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-sm">
-              <h3 className="text-base font-bold text-slate-800 mb-4 pb-3 border-b border-slate-100">Form Tambah Akun Siswa Baru</h3>
-              <form onSubmit={handleAddSiswa} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">NIS *</label>
-                    <input type="text" value={newNis} onChange={(e) => setNewNis(e.target.value)} required placeholder="Contoh: 10011" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nama Lengkap *</label>
-                    <input type="text" value={newNama} onChange={(e) => setNewNama(e.target.value)} required placeholder="Contoh: Ahmad Fauzan" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Kelas *</label>
-                    <select value={newKelasId} onChange={(e) => setNewKelasId(e.target.value)} required className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 bg-white transition-all">
-                      <option value="">Pilih Kelas</option>
-                      {kelasList.map((k) => (
-                        <option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Username Login *</label>
-                    <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} required placeholder="Contoh: 10011" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all font-mono" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Password * (min. 6 karakter)</label>
-                    <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} placeholder="Contoh: siswa123" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all font-mono" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">No. WA Orang Tua (628xxx)</label>
-                    <input type="text" value={newWa} onChange={(e) => setNewWa(e.target.value)} placeholder="Contoh: 6281234567890" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-all font-mono" />
-                  </div>
-                </div>
-                <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
-                  <button type="button" onClick={() => setShowAddSiswaForm(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">Batal</button>
-                  <button type="submit" disabled={addSiswaLoading} className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-all disabled:opacity-50 active:scale-95">
-                    {addSiswaLoading ? 'Menyimpan...' : 'Simpan Akun Siswa'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800">Daftar Akun Siswa ({filteredSiswa.length} siswa)</h3>
-              {siswaLoading && <span className="text-xs text-slate-400 animate-pulse">Memuat...</span>}
+          {guruMsg && (<div className={`p-4 rounded-[var(--radius-input)] text-sm font-semibold border animate-slide-down ${guruMsg.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>{guruMsg.text}</div>)}
+          <div className="glass-card overflow-hidden">
+            <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+              <h3 className="font-bold text-[var(--text-primary)]">Daftar Guru ({guruList.length})</h3>
+              {guruLoading && <span className="text-xs text-[var(--text-muted)] animate-pulse">Memuat...</span>}
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">NIS</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Nama Siswa</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Kelas</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">Username</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left hidden md:table-cell">No. WA Ortu</th>
-                    <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filteredSiswa.length === 0 && !siswaLoading ? (
-                    <tr><td colSpan={6} className="p-10 text-center text-slate-400 text-sm">
-                      {filterKelas === 'all' ? 'Belum ada data. Klik "Tambah Siswa Baru".' : 'Tidak ada siswa di kelas ini.'}
-                    </td></tr>
-                  ) : filteredSiswa.map((siswa) => (
-                    <tr key={siswa.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-4 text-sm text-slate-600 font-mono">{siswa.nis}</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-700 font-bold text-xs flex-shrink-0">{siswa.nama.charAt(0)}</div>
-                          <span className="font-semibold text-slate-800 text-sm">{siswa.nama}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm text-slate-600">{siswa.kelas.nama.replace(/-/g, ' ')}</td>
-                      <td className="p-4 text-sm text-slate-600 font-mono">{siswa.username}</td>
-                      <td className="p-4 text-sm text-slate-500 hidden md:table-cell font-mono">{siswa.whatsappOrangTua || '-'}</td>
-                      <td className="p-4 text-center">
-                        <button onClick={() => handleDeleteSiswa(siswa.id, siswa.nama)} className="px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-100 hover:border-rose-200 rounded-lg transition-all">Hapus</button>
-                      </td>
+              <table className="table-premium">
+                <thead><tr><th>Username</th><th>Nama</th><th>Kelas</th><th className="text-center">Aksi</th></tr></thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {guruList.length === 0 && !guruLoading ? (<tr><td colSpan={4} className="p-10 text-center text-[var(--text-muted)] text-sm">Belum ada data.</td></tr>)
+                  : guruList.map((g) => (
+                    <tr key={g.id} className="hover:bg-[var(--bg-glass)] transition-colors">
+                      <td className="font-mono">{g.username}</td>
+                      <td><span className="font-semibold text-[var(--text-primary)] text-sm">{g.nama}</span></td>
+                      <td>{g.kelas?.nama?.replace(/-/g, ' ') || '-'}</td>
+                      <td className="text-center"><button onClick={() => setDeleteTarget({ id: g.id, nama: g.nama, type: 'guru' })} className="btn-danger px-3 py-1.5 text-xs font-bold">Hapus</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -448,6 +296,127 @@ export default function ManagementPage() {
           </div>
         </div>
       )}
+
+      {/* ======== SISWA TAB ======== */}
+      {activeTab === 'siswa' && (
+        <div className="space-y-5 animate-fade-in">
+          <div className="glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div><h2 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Akun Siswa</h2><p className="text-[var(--text-muted)] text-xs mt-0.5">Tambah, lihat, atau hapus akun siswa.</p></div>
+            <button onClick={() => setShowAddSiswa(true)} className="btn-primary px-5 py-2.5 text-sm font-bold">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" /></svg>Tambah Siswa
+            </button>
+          </div>
+
+          <div className="glass-card p-4">
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-2">Filter Kelas</label>
+            <select value={filterKelas} onChange={(e) => setFilterKelas(e.target.value)} className="glass-select w-full md:w-64 p-2.5 text-sm">
+              <option value="all">Semua Kelas</option>
+              {kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>))}
+            </select>
+          </div>
+
+          {siswaMsg && (
+            <div className={`p-4 rounded-[var(--radius-input)] text-sm font-semibold border animate-slide-down ${siswaMsg.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>{siswaMsg.text}</div>
+          )}
+
+          <div className="glass-card overflow-hidden">
+            <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+              <h3 className="font-bold text-[var(--text-primary)]">Daftar Siswa ({filteredSiswa.length})</h3>
+              {siswaLoading && <span className="text-xs text-[var(--text-muted)] animate-pulse">Memuat...</span>}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table-premium">
+                <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Username</th><th className="hidden md:table-cell">WA Ortu</th><th className="text-center">Aksi</th></tr></thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {filteredSiswa.length === 0 && !siswaLoading ? (
+                    <tr><td colSpan={6} className="p-10 text-center text-[var(--text-muted)] text-sm">Belum ada data.</td></tr>
+                  ) : filteredSiswa.map((s) => (
+                    <tr key={s.id} className="hover:bg-[var(--bg-glass)] transition-colors">
+                      <td className="font-mono">{s.nis}</td>
+                      <td><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-[var(--radius-pill)] bg-[var(--bg-glass)] flex items-center justify-center text-[var(--text-secondary)] font-bold text-xs">{s.nama.charAt(0)}</div><span className="font-semibold text-[var(--text-primary)] text-sm">{s.nama}</span></div></td>
+                      <td>{s.kelas.nama.replace(/-/g, ' ')}</td>
+                      <td className="font-mono">{s.username}</td>
+                      <td className="hidden md:table-cell font-mono text-[var(--text-muted)]">{s.whatsappOrangTua || '-'}</td>
+                      <td className="text-center"><button onClick={() => setDeleteTarget({ id: s.id, nama: s.nama, type: 'siswa' })} className="btn-danger px-3 py-1.5 text-xs font-bold">Hapus</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======== MODALS ======== */}
+
+      {/* Add Kelas Modal */}
+      <Modal open={showAddKelas} onClose={() => setShowAddKelas(false)} title="Tambah Kelas Baru">
+        <form onSubmit={handleAddKelas} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Nama Kelas *</label><input type="text" value={newKNama} onChange={(e) => setNewKNama(e.target.value)} required placeholder="XI-RPL-1" className="glass-input w-full p-2.5 text-sm" /></div>
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Wali Kelas *</label><input type="text" value={newWKelas} onChange={(e) => setNewWKelas(e.target.value)} required placeholder="Budi Santoso, S.Pd" className="glass-input w-full p-2.5 text-sm" /></div>
+          </div>
+          <div className="border-t border-[var(--border-subtle)] pt-3">
+            <p className="text-xs font-semibold text-[var(--brand)] mb-3">Akun Guru (opsional)</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Username Guru</label><input type="text" value={guruUsername} onChange={(e) => setGuruUsername(e.target.value)} placeholder="guru_xirpl1" className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Password Guru</label><input type="text" value={guruPassword} onChange={(e) => setGuruPassword(e.target.value)} placeholder="min 6 karakter" className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+            </div>
+          </div>
+          <div className="flex gap-3 justify-end pt-2 border-t border-[var(--border-subtle)]">
+            <button type="button" onClick={() => setShowAddKelas(false)} className="btn btn-secondary px-4 py-2 text-sm">Batal</button>
+            <button type="submit" disabled={addKelasLoading} className="btn-primary px-6 py-2 text-sm">{addKelasLoading ? 'Menyimpan...' : 'Simpan'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Kelas Modal */}
+      <Modal open={editKelas !== null} onClose={() => setEditKelas(null)} title="Edit Kelas">
+        <form onSubmit={handleEditKelas} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Nama Kelas *</label><input type="text" value={editKNama} onChange={(e) => setEditKNama(e.target.value)} required className="glass-input w-full p-2.5 text-sm" /></div>
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Wali Kelas *</label><input type="text" value={editWKelas} onChange={(e) => setEditWKelas(e.target.value)} required className="glass-input w-full p-2.5 text-sm" /></div>
+          </div>
+          <div className="flex gap-3 justify-end pt-2 border-t border-[var(--border-subtle)]">
+            <button type="button" onClick={() => setEditKelas(null)} className="btn btn-secondary px-4 py-2 text-sm">Batal</button>
+            <button type="submit" disabled={editLoading} className="btn-primary px-6 py-2 text-sm">{editLoading ? 'Menyimpan...' : 'Simpan'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Siswa Modal */}
+      <Modal open={showAddSiswa} onClose={() => setShowAddSiswa(false)} title="Tambah Akun Siswa Baru">
+        <form onSubmit={handleAddSiswa} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">NIS *</label><input type="text" value={fNis} onChange={(e) => setFNis(e.target.value)} required placeholder="10011" className="glass-input w-full p-2.5 text-sm" /></div>
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Nama *</label><input type="text" value={fNama} onChange={(e) => setFNama(e.target.value)} required placeholder="Ahmad Fauzan" className="glass-input w-full p-2.5 text-sm" /></div>
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Kelas *</label><select value={fKelasId} onChange={(e) => setFKelasId(e.target.value)} required className="glass-select w-full p-2.5 text-sm"><option value="">Pilih</option>{kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>))}</select></div>
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Username *</label><input type="text" value={fUsername} onChange={(e) => setFUsername(e.target.value)} required placeholder="10011" className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+            <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Password *</label><input type="text" value={fPassword} onChange={(e) => setFPassword(e.target.value)} required minLength={6} placeholder="siswa123" className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+            <div className="md:col-span-2"><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">WA Ortu (628xxx)</label><input type="text" value={fWa} onChange={(e) => setFWa(e.target.value)} placeholder="6281234567890" className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+          </div>
+          <div className="flex gap-3 justify-end pt-2 border-t border-[var(--border-subtle)]">
+            <button type="button" onClick={() => setShowAddSiswa(false)} className="btn btn-secondary px-4 py-2 text-sm">Batal</button>
+            <button type="submit" disabled={addSiswaLoading} className="btn-primary px-6 py-2 text-sm">{addSiswaLoading ? 'Menyimpan...' : 'Simpan'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirm Modal — routes to correct handler based on type */}
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Konfirmasi Hapus"
+        message={`Yakin ingin menghapus "${deleteTarget?.nama}"? Tindakan ini tidak bisa dibatalkan.`}
+        confirmLabel="Hapus"
+        loading={deleteLoading}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          if (deleteTarget.type === 'kelas') handleDeleteKelas();
+          else if (deleteTarget.type === 'guru') handleDeleteGuru();
+          else handleDeleteSiswa();
+        }}
+        onCancel={() => { setDeleteTarget(null); setDeleteLoading(false); }}
+      />
     </div>
   );
 }
