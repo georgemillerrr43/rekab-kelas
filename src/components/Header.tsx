@@ -32,7 +32,7 @@ export default function Header() {
     window.location.href = '/login';
   };
 
-  let logoHref = '/rekap';
+  let logoHref = '/rekap/public';
   if (session.isLoggedIn) {
     logoHref = session.role === 'ADMIN' ? '/' : '/siswa';
   }
@@ -61,7 +61,7 @@ export default function Header() {
     }
   } else {
     navLinks = [
-      { href: '/rekap', label: 'Rekap' },
+      { href: '/rekap/public', label: 'Rekap' },
       { href: '/login', label: 'Masuk' },
     ];
   }

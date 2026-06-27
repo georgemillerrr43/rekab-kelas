@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -97,21 +98,24 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors p-1"
+                  tabIndex={-1}
                 >
                   {showPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} viewBox="0 0 24 24">
-                      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0Z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} viewBox="0 0 24 24">
+                    /* Eye with slash — password visible */
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                       <path d="M3.933 13.909A4.75 4.75 0 0 0 17.49 15.6" />
                       <path d="M11.392 16.956a5.25 5.25 0 0 1-7.46-3.046" />
                       <path d="M3.513 10.09a4.75 4.75 0 0 1 13.577-1.71" />
                       <path d="M8.542 6.124a5.25 5.25 0 0 1 7.94 3.58" />
                       <path d="M21.647 10.273a.5.5 0 0 1-.089.726l-18 13.364a.5.5 0 0 1-.637-.074l-.932-1a.5.5 0 0 1 .088-.726l18-13.364a.5.5 0 0 1 .637.074Z" />
                       <path d="M2.353 13.727a.5.5 0 0 1 .089-.726l18-13.364a.5.5 0 0 1 .637.074l.932 1a.5.5 0 0 1-.088.726l-18 13.364a.5.5 0 0 1-.637-.074Z" />
+                    </svg>
+                  ) : (
+                    /* Plain eye — password hidden */
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0Z" />
+                      <circle cx="12" cy="12" r="3" />
                     </svg>
                   )}
                 </button>
@@ -121,7 +125,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="btn-primary w-full py-3 text-sm font-bold mt-2"
+              className="btn-primary w-full py-3 text-sm font-bold mt-2 flex items-center justify-center"
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
@@ -135,8 +139,8 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="pt-2">
-            <div className="p-4 rounded-[var(--radius-input)] bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)]">
+          <div className="pt-2 space-y-3">
+            <div className="p-4 rounded-[var(--radius-input)] bg-[rgba(59,130,246,0.06)] border border-[rgba(59,130,246,0.12)]">
               <p className="text-xs font-bold text-[var(--text-muted)] mb-2 uppercase tracking-wider">Demo Credentials</p>
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-center gap-2">
@@ -153,6 +157,16 @@ export default function LoginPage() {
                 </div>
               </div>
             </div>
+
+            <Link
+              href="/rekap/public"
+              className="flex items-center justify-center gap-2 p-3 rounded-[var(--radius-input)] border border-[var(--border-default)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--brand)] hover:border-[var(--brand)] transition-all group"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 group-hover:text-[var(--brand)]">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" />
+              </svg>
+              Akses Rekapitulasi Publik
+            </Link>
           </div>
         </div>
 
