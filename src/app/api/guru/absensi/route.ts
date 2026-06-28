@@ -11,13 +11,23 @@ export async function GET(req: NextRequest) {
     if (!guru) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const tanggal = new URL(req.url).searchParams.get('tanggal') || new Date().toISOString().split('T')[0];
+    const targetDate = new Date(tanggal);
     const siswaIds = guru.kelas.siswa.map(s => s.id);
-    const kehadiranList = await prisma.kehadiran.findMany({ where: { tanggal: new Date(tanggal), siswaId: { in: siswaIds } } });
+    const kehadiranList = await prisma.kehadiran.findMany({ where: { tanggal: targetDate, siswaId: { in: siswaIds } }, include: { izin: true } });
     const km = new Map(kehadiranList.map(k => [k.siswaId, k]));
+
+    const approvedIzin = await prisma.izin.findMany({
+      where: { siswaId: { in: siswaIds }, statusApproval: 'APPROVED', kehadiran: { tanggal: targetDate } },
+    });
 
     const students = guru.kelas.siswa.map(s => {
       const k = km.get(s.id);
-      return { id: s.id, nis: s.nis, nama: s.nama, whatsappOrangTua: s.whatsappOrangTua, status: k?.status || 'BELUM', alasan: '' };
+      const approved = approvedIzin.find(i => i.siswaId === s.id);
+      if (approved) {
+        const status = approved.alasan ? 'IZIN' : 'SAKIT';
+        return { id: s.id, nis: s.nis, nama: s.nama, whatsappOrangTua: s.whatsappOrangTua, status: k?.status || status as any, alasan: k?.izin?.alasan || approved.alasan || '', buktiUrl: k?.izin?.buktiFoto || approved.buktiFoto || '', izinAuto: true };
+      }
+      return { id: s.id, nis: s.nis, nama: s.nama, whatsappOrangTua: s.whatsappOrangTua, status: k?.status || 'BELUM', alasan: k?.izin?.alasan || '', buktiUrl: k?.izin?.buktiFoto || '', izinAuto: false };
     });
 
     const alreadySubmitted = kehadiranList.length === siswaIds.length;
@@ -43,24 +53,18 @@ export async function POST(req: NextRequest) {
     for (const item of data) {
       if (!kelasSiswaIds.has(item.siswaId)) continue;
 
-      // Handle IZIN/SAKIT — create or reuse izin record with buktiUrl
-      if ((item.status === 'IZIN' || item.status === 'SAKIT') && item.alasan) {
+      if (item.status === 'IZIN' || item.status === 'SAKIT') {
         const existingKhd = await prisma.kehadiran.findUnique({
           where: { siswaId_tanggal: { siswaId: item.siswaId, tanggal: new Date(tanggal) } },
         });
 
         let izinId = existingKhd?.izinId || undefined;
-        if (!izinId) {
+        if (!izinId && item.alasan) {
           const newIzin = await prisma.izin.create({
-            data: {
-              siswaId: item.siswaId,
-              alasan: item.alasan || '',
-              buktiFoto: item.buktiUrl || '',
-              statusApproval: 'PENDING',
-            },
+            data: { siswaId: item.siswaId, alasan: item.alasan, buktiFoto: item.buktiUrl || '', statusApproval: 'PENDING' },
           });
           izinId = newIzin.id;
-        } else {
+        } else if (izinId) {
           await prisma.izin.update({
             where: { id: izinId },
             data: { alasan: item.alasan, buktiFoto: item.buktiUrl || '' },
@@ -69,8 +73,8 @@ export async function POST(req: NextRequest) {
 
         await prisma.kehadiran.upsert({
           where: { siswaId_tanggal: { siswaId: item.siswaId, tanggal: new Date(tanggal) } },
-          update: { status: item.status, izinId },
-          create: { siswaId: item.siswaId, tanggal: new Date(tanggal), status: item.status, izinId },
+          update: { status: item.status, ...(izinId ? { izinId } : {}) },
+          create: { siswaId: item.siswaId, tanggal: new Date(tanggal), status: item.status, ...(izinId ? { izinId } : {}) },
         });
       } else {
         await prisma.kehadiran.upsert({

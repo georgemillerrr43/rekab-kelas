@@ -121,48 +121,70 @@ export default function SiswaDashboard() {
             <h3 className="font-bold text-[var(--text-primary)] text-sm">Riwayat Pengajuan Izin/Sakit</h3>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">Daftar 10 pengajuan terbaru Anda.</p>
           </div>
-          <button onClick={() => setShowForm(!showForm)} className="btn-primary px-4 py-2 text-xs font-bold">
+          <button onClick={() => setShowForm(true)} className="btn-primary px-4 py-2 text-xs font-bold">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             Ajukan Izin
           </button>
         </div>
 
+        {/* Modal */}
         {showForm && (
-          <div className="mb-6 p-5 bg-[var(--bg-glass)] border border-[var(--border-subtle)] rounded-[var(--radius-card)] space-y-4">
-            <h4 className="font-bold text-[var(--text-primary)] text-sm">Form Pengajuan Izin/Sakit</h4>
-            {formError && <p className="text-[var(--bearish)] text-xs font-semibold bg-[rgba(239,68,68,0.08)] p-3 rounded-[var(--radius-input)] border border-[rgba(239,68,68,0.15)]">{formError}</p>}
-            <form onSubmit={handleSubmitIzin} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Tanggal</label><input type="date" value={formTanggal} onChange={(e) => setFormTanggal(e.target.value)} required className="glass-input w-full p-2.5 text-sm" /></div>
-                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Jenis</label><select value={formTipe} onChange={(e) => setFormTipe(e.target.value as 'IZIN' | 'SAKIT')} className="glass-select w-full p-2.5 text-sm"><option value="IZIN">Izin</option><option value="SAKIT">Sakit</option></select></div>
+          <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md" onClick={(e) => { if (e.target === e.currentTarget) setShowForm(false); }}>
+            <div className="w-full max-w-md glass rounded-2xl shadow-2xl animate-slide-up border border-white/10" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                <h3 className="font-bold text-white text-base">Ajukan Izin / Sakit</h3>
+                <button onClick={() => setShowForm(false)} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-white/60"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
               </div>
-              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Alasan *</label><textarea value={formAlasan} onChange={(e) => setFormAlasan(e.target.value)} required rows={3} placeholder="Jelaskan alasan..." className="glass-input w-full p-2.5 text-sm resize-none" /></div>
-              <div>
-                <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Foto Bukti (JPEG/PNG, Maks. 2MB) *</label>
-                <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleFileChange} required className="w-full text-xs text-[var(--text-muted)] file:mr-2 file:py-2 file:px-3 file:rounded-[var(--radius-pill)] file:border-0 file:text-xs file:font-semibold file:bg-[rgba(99,102,241,0.1)] file:text-[var(--brand)] hover:file:bg-[rgba(99,102,241,0.15)] cursor-pointer" />
-                {formPreview && <div className="mt-2 w-20 h-20 rounded-[var(--radius-card)] overflow-hidden border border-[var(--border-default)]"><img src={formPreview} alt="preview" className="w-full h-full object-cover" /></div>}
+              <div className="px-6 py-5 space-y-4">
+                {formError && <p className="text-red-400 text-xs font-semibold bg-red-500/10 p-3 rounded-xl border border-red-500/20">{formError}</p>}
+                <form onSubmit={handleSubmitIzin} className="space-y-4" id="izinForm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider">Tanggal</label>
+                      <input type="date" value={formTanggal} onChange={(e) => setFormTanggal(e.target.value)} required className="w-full px-3 py-2.5 text-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider">Jenis</label>
+                      <select value={formTipe} onChange={(e) => setFormTipe(e.target.value as 'IZIN' | 'SAKIT')} className="w-full px-3 py-2.5 text-sm bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all appearance-none">
+                        <option value="IZIN" className="bg-gray-900">Izin</option>
+                        <option value="SAKIT" className="bg-gray-900">Sakit</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider">Alasan</label>
+                    <textarea value={formAlasan} onChange={(e) => setFormAlasan(e.target.value)} required rows={3} placeholder="Jelaskan alasan..." className="w-full px-3 py-2.5 text-sm bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-all resize-none" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider">Foto Bukti</label>
+                    <input type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleFileChange} required className="w-full text-xs text-white/50 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20 transition-all cursor-pointer" />
+                    {formPreview && <div className="mt-2 w-16 h-16 rounded-xl overflow-hidden border border-white/10"><img src={formPreview} alt="" className="w-full h-full object-cover" /></div>}
+                  </div>
+                </form>
               </div>
-              <div className="flex gap-3 justify-end">
-                <button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary px-4 py-2 text-xs">Batal</button>
-                <button type="submit" disabled={formLoading} className="btn-primary px-5 py-2 text-xs">{formLoading ? 'Mengirim...' : 'Kirim'}</button>
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-white/10">
+                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-semibold rounded-full bg-white/5 text-white/60 hover:bg-white/10 transition-all">Batal</button>
+                <button type="submit" form="izinForm" disabled={formLoading} className="px-5 py-2 text-sm font-bold rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:brightness-110 transition-all disabled:opacity-40">{formLoading ? 'Mengirim...' : 'Kirim'}</button>
               </div>
-            </form>
+            </div>
           </div>
         )}
 
         {isLoading ? (
-          <div className="text-center py-10 text-[var(--text-muted)] text-sm">Memuat data...</div>
+          <div className="text-center py-10 text-sm text-white/40">Memuat data...</div>
         ) : izinList.length === 0 ? (
           <div className="text-center py-10">
-            <p className="text-[var(--text-muted)] font-semibold text-sm">Belum ada riwayat pengajuan izin.</p>
+            <p className="text-sm font-semibold text-white/40">Belum ada riwayat pengajuan izin.</p>
           </div>
         ) : (
           <div className="space-y-2">
             {izinList.map((item) => (
-              <div key={item.id} className="p-4 border border-[var(--border-subtle)] rounded-[var(--radius-card)] flex justify-between items-start gap-4 hover:bg-[var(--bg-glass)] transition-colors">
+              <div key={item.id} className="p-4 border border-white/5 rounded-xl flex justify-between items-start gap-4 hover:bg-white/[0.02] transition-colors">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-[var(--text-secondary)] font-medium line-clamp-2">{item.alasan}</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">{new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                  <p className="text-sm text-white/70 font-medium line-clamp-2">{item.alasan}</p>
+                  <p className="text-xs text-white/40 mt-1">{new Date(item.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                 </div>
                 <span className={`badge ${sb[item.statusApproval]} flex-shrink-0`}>{sl[item.statusApproval]}</span>
               </div>

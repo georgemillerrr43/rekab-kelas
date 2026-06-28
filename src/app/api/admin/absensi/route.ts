@@ -19,29 +19,49 @@ export async function GET(request: NextRequest) {
 
   try {
     const targetDate = new Date(tanggal);
+
+    let kelasRecord = await prisma.kelas.findFirst({
+      where: { OR: [{ id: kelas }, { nama: kelas }] },
+    });
+    if (!kelasRecord) {
+      return NextResponse.json({ error: 'Kelas tidak ditemukan' }, { status: 404 });
+    }
+
     const students = await prisma.siswa.findMany({
-      where: { kelasId: kelas },
+      where: { kelasId: kelasRecord.id },
       orderBy: { nis: 'asc' },
     });
+    const studentIds = students.map((s) => s.id);
 
     const kehadiran = await prisma.kehadiran.findMany({
-      where: {
-        siswaId: { in: students.map((s) => s.id) },
-        tanggal: targetDate,
-      },
+      where: { siswaId: { in: studentIds }, tanggal: targetDate },
       include: { izin: true },
+    });
+
+    // Look up approved izin for this date
+    const approvedIzin = await prisma.izin.findMany({
+      where: {
+        siswaId: { in: studentIds },
+        statusApproval: 'APPROVED',
+        kehadiran: { tanggal: targetDate },
+      },
     });
 
     const result = students.map((siswa) => {
       const khd = kehadiran.find((k) => k.siswaId === siswa.id);
+      const approved = approvedIzin.find((i) => i.siswaId === siswa.id);
+      if (approved) {
+        const status = approved.alasan ? 'IZIN' : 'SAKIT';
+        return {
+          id: siswa.id, nis: siswa.nis, nama: siswa.nama, whatsappOrangTua: siswa.whatsappOrangTua,
+          status: khd?.status || status as any, alasan: khd?.izin?.alasan || approved.alasan || '',
+          buktiUrl: khd?.izin?.buktiFoto || approved.buktiFoto || '', izinAuto: true,
+        };
+      }
       return {
-        id: siswa.id,
-        nis: siswa.nis,
-        nama: siswa.nama,
-        whatsappOrangTua: siswa.whatsappOrangTua,
-        status: khd?.status || 'BELUM',
-        alasan: khd?.izin?.alasan || '',
-        buktiUrl: khd?.izin?.buktiFoto || '',
+        id: siswa.id, nis: siswa.nis, nama: siswa.nama, whatsappOrangTua: siswa.whatsappOrangTua,
+        status: khd?.status || 'BELUM', alasan: khd?.izin?.alasan || '', buktiUrl: khd?.izin?.buktiFoto || '',
+        izinAuto: false,
       };
     });
 

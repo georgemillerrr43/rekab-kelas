@@ -34,7 +34,7 @@ export default function GuruDashboard() {
         <div className="stat-card"><p className="label">Hari Aktif</p><p className="value text-[var(--brand)]">{stats.totalDays}</p></div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 stagger-enter">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-enter">
         <Link href="/guru/absensi" className="glass-card-hover p-5 group">
           <p className="font-bold text-sm text-[var(--text-primary)] group-hover:text-[var(--brand)]">Input Absensi</p>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">Catat kehadiran siswa hari ini.</p>

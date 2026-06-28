@@ -329,7 +329,7 @@ function RekapPageInner() {
       )}
 
       {selectedPhoto && (
-        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="relative glass rounded-3xl overflow-hidden max-w-2xl w-full shadow-2xl">
             <button onClick={() => setSelectedPhoto(null)} className="absolute right-4 top-4 p-2 bg-black/60 text-white hover:bg-black/80 rounded-full transition-colors z-10">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>

@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 
@@ -9,8 +9,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
 
     const totalStudents = await prisma.siswa.count();
     const pendingIzinCount = await prisma.izin.count({
@@ -18,20 +20,17 @@ export async function GET(request: NextRequest) {
     });
 
     const todayKehadiran = await prisma.kehadiran.findMany({
-      where: { tanggal: today },
+      where: { tanggal: { gte: todayStart, lt: todayEnd } },
     });
     const todayHadir = todayKehadiran.filter((k) => k.status === 'HADIR').length;
     const todayStats = `${todayHadir}/${totalStudents}`;
 
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+    const startOfMonth = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+    const endOfMonth = new Date(todayStart.getFullYear(), todayStart.getMonth() + 1, 0, 23, 59, 59);
 
     const monthlyKehadiran = await prisma.kehadiran.findMany({
       where: {
-        tanggal: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
+        tanggal: { gte: startOfMonth, lte: endOfMonth },
       },
     });
 
@@ -50,38 +49,37 @@ export async function GET(request: NextRequest) {
       { label: 'Alpa', value: totalKhd > 0 ? Number(((totalAlpa / totalKhd) * 100).toFixed(1)) : 0, color: 'bg-rose-500' },
     ];
 
+    // Top absentees
     const absentees = await prisma.siswa.findMany({
       select: {
-        nis: true,
-        nama: true,
-        kehadiran: {
-          where: {
-            status: 'ALPA',
-            tanggal: { gte: startOfMonth, lte: endOfMonth },
-          },
-        },
+        nis: true, nama: true,
+        kehadiran: { where: { status: 'ALPA', tanggal: { gte: startOfMonth, lte: endOfMonth } } },
       },
     });
-
     const topAbsentees = absentees
-      .map((s) => ({
-        nis: s.nis,
-        nama: s.nama,
-        alpa: s.kehadiran.length,
-      }))
+      .map((s) => ({ nis: s.nis, nama: s.nama, alpa: s.kehadiran.length }))
       .filter((s) => s.alpa > 0)
       .sort((a, b) => b.alpa - a.alpa)
       .slice(0, 4);
 
+    // Per-class attendance
+    const kelasList = await prisma.kelas.findMany({ include: { _count: { select: { siswa: true } } } });
+    const perKelas = await Promise.all(
+      kelasList.map(async (k) => {
+        const ids = (await prisma.siswa.findMany({ where: { kelasId: k.id }, select: { id: true } })).map(s => s.id);
+        const khd = monthlyKehadiran.filter(h => ids.includes(h.siswaId));
+        const hadir = khd.filter(h => h.status === 'HADIR').length;
+        const pct = khd.length > 0 ? Number(((hadir / khd.length) * 100).toFixed(1)) : 0;
+        return { nama: k.nama.replace(/-/g, ' '), persen: pct, siswa: k._count.siswa };
+      })
+    );
+    perKelas.sort((a, b) => b.persen - a.persen);
+
     return NextResponse.json({
-      avgAttendance,
-      todayStats,
-      pendingIzinCount,
-      totalStudents,
-      topAbsentees,
-      distribution,
+      avgAttendance, todayStats, pendingIzinCount, totalStudents, topAbsentees, distribution, perKelas,
     });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

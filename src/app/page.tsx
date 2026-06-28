@@ -18,7 +18,7 @@ export default function AdminDashboard() {
     avgAttendance: '0.0', todayStats: '0/0', pendingIzinCount: 0, totalStudents: 0,
     topAbsentees: [] as { nis: string; nama: string; alpa: number }[],
     distribution: [] as { label: string; value: number; color: string }[],
-    dataMingguan: [] as { hari: string; persen: number }[],
+    perKelas: [] as { nama: string; persen: number; siswa: number }[],
   });
 
   const fetchData = async () => {
@@ -80,7 +80,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        <DashboardChart dataMingguan={stats.dataMingguan} dataDistribusi={stats.distribution} />
+        <DashboardChart dataDistribusi={stats.distribution} perKelas={stats.perKelas} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="glass-card p-5">
