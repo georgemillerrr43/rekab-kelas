@@ -81,6 +81,9 @@
     font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
   ::selection { background: rgba(59, 130, 246, 0.3); color: #fff; }
   input, select, textarea, button { font-family: inherit; }

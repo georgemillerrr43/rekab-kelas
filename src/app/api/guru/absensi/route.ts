@@ -42,11 +42,43 @@ export async function POST(req: NextRequest) {
     const kelasSiswaIds = new Set(guru.kelas.siswa.map(s => s.id));
     for (const item of data) {
       if (!kelasSiswaIds.has(item.siswaId)) continue;
-      await prisma.kehadiran.upsert({
-        where: { siswaId_tanggal: { siswaId: item.siswaId, tanggal: new Date(tanggal) } },
-        update: { status: item.status },
-        create: { siswaId: item.siswaId, tanggal: new Date(tanggal), status: item.status },
-      });
+
+      // Handle IZIN/SAKIT — create or reuse izin record with buktiUrl
+      if ((item.status === 'IZIN' || item.status === 'SAKIT') && item.alasan) {
+        const existingKhd = await prisma.kehadiran.findUnique({
+          where: { siswaId_tanggal: { siswaId: item.siswaId, tanggal: new Date(tanggal) } },
+        });
+
+        let izinId = existingKhd?.izinId || undefined;
+        if (!izinId) {
+          const newIzin = await prisma.izin.create({
+            data: {
+              siswaId: item.siswaId,
+              alasan: item.alasan || '',
+              buktiFoto: item.buktiUrl || '',
+              statusApproval: 'PENDING',
+            },
+          });
+          izinId = newIzin.id;
+        } else {
+          await prisma.izin.update({
+            where: { id: izinId },
+            data: { alasan: item.alasan, buktiFoto: item.buktiUrl || '' },
+          });
+        }
+
+        await prisma.kehadiran.upsert({
+          where: { siswaId_tanggal: { siswaId: item.siswaId, tanggal: new Date(tanggal) } },
+          update: { status: item.status, izinId },
+          create: { siswaId: item.siswaId, tanggal: new Date(tanggal), status: item.status, izinId },
+        });
+      } else {
+        await prisma.kehadiran.upsert({
+          where: { siswaId_tanggal: { siswaId: item.siswaId, tanggal: new Date(tanggal) } },
+          update: { status: item.status },
+          create: { siswaId: item.siswaId, tanggal: new Date(tanggal), status: item.status },
+        });
+      }
     }
     return NextResponse.json({ success: true });
   } catch (e) {
