@@ -1,4 +1,5 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { sendWhatsAppNotification } from '@/utils/waNotification';
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const tanggal = targetIzin.tanggal || new Date();
     if (status === 'APPROVED') {
-      // Izin disetujui → bikin/update Kehadiran sesuai tipe
+      // Izin disetujui ? bikin/update Kehadiran sesuai tipe
       await prisma.kehadiran.upsert({
         where: { siswaId_tanggal: { siswaId: targetIzin.siswaId, tanggal } },
         update: { status: (targetIzin.tipe as any) || 'IZIN', izinId: id },
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
         alasan: targetIzin.alasan,
       });
     } else {
-      // Izin ditolak → Kehadiran status ALPA
+      // Izin ditolak ? Kehadiran status ALPA
       if (targetIzin.kehadiran) {
         await prisma.kehadiran.update({
           where: { id: targetIzin.kehadiran.id },

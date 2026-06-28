@@ -132,6 +132,23 @@ function AttendanceFormInner() {
   if (isLoading && kelas) return <div className="glass-card max-w-5xl mx-auto p-6 text-center py-20 text-[var(--text-muted)] font-semibold">Memuat data absensi...</div>;
 
   if (!kelas) {
+    if (kelasList.length === 0) {
+      return (
+        <div className="glass-card max-w-5xl mx-auto p-6">
+          <div className="text-center py-16">
+            <div className="w-20 h-20 rounded-[var(--radius-pill)] bg-[var(--bg-glass)] flex items-center justify-center mx-auto mb-5">
+              <svg className="w-10 h-10 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            </div>
+            <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">Belum Ada Kelas</h3>
+            <p className="text-[var(--text-muted)] text-sm mb-8 max-w-xs mx-auto">Buat kelas terlebih dahulu sebelum mengisi absensi.</p>
+            <button type="button" onClick={() => router.push('/manajemen')} className="btn-primary px-6 py-2.5 text-sm font-semibold inline-flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Tambah Kelas
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="glass-card max-w-5xl mx-auto p-6">
         <div className="text-center py-12">
