@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface KelasItem { id: string; nama: string; waliKelas: string; _count: { siswa: number }; }
-interface SiswaItem { id: string; nis: string; nama: string; username: string; whatsappOrangTua: string; kelasId: string; kelas: { id: string; nama: string; waliKelas: string }; }
+interface GuruItem { id: string; username: string; nama: string; passwordPlain: string; kelasId: string; kelas: { id: string; nama: string; waliKelas: string }; }
+interface SiswaItem { id: string; nis: string; nama: string; username: string; passwordPlain: string; whatsappOrangTua: string; kelasId: string; kelas: { id: string; nama: string; waliKelas: string }; }
 type TabType = 'kelas' | 'guru' | 'siswa';
 
 function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
@@ -76,7 +77,7 @@ export default function ManagementPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; nama: string; type: 'kelas' | 'guru' | 'siswa' } | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [guruList, setGuruList] = useState<any[]>([]);
+  const [guruList, setGuruList] = useState<GuruItem[]>([]);
   const [guruLoading, setGuruLoading] = useState(false);
   const [guruMsg, setGuruMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [siswaList, setSiswaList] = useState<SiswaItem[]>([]);
@@ -88,6 +89,23 @@ export default function ManagementPage() {
   const [fNis, setFNis] = useState(''); const [fNama, setFNama] = useState('');
   const [fKelasId, setFKelasId] = useState(''); const [fUsername, setFUsername] = useState('');
   const [fPassword, setFPassword] = useState(''); const [fWa, setFWa] = useState('');
+  // Guru: password toggle, edit, export
+  const [visibleGuruPassword, setVisibleGuruPassword] = useState<Record<string, boolean>>({});
+  const [editGuru, setEditGuru] = useState<{ id: string; username: string; nama: string } | null>(null);
+  const [editGuruUsername, setEditGuruUsername] = useState('');
+  const [editGuruNama, setEditGuruNama] = useState('');
+  const [editGuruPassword, setEditGuruPassword] = useState('');
+  const [editGuruLoading, setEditGuruLoading] = useState(false);
+  // Siswa: password toggle, edit, export
+  const [visibleSiswaPassword, setVisibleSiswaPassword] = useState<Record<string, boolean>>({});
+  const [editSiswa, setEditSiswa] = useState<SiswaItem | null>(null);
+  const [editSiswaNis, setEditSiswaNis] = useState('');
+  const [editSiswaNama, setEditSiswaNama] = useState('');
+  const [editSiswaUsername, setEditSiswaUsername] = useState('');
+  const [editSiswaPassword, setEditSiswaPassword] = useState('');
+  const [editSiswaWa, setEditSiswaWa] = useState('');
+  const [editSiswaLoading, setEditSiswaLoading] = useState(false);
+  const [exportKelasFilter, setExportKelasFilter] = useState('all');
 
   useEffect(() => {
     if (activeTab === 'kelas') fetchKelas();
@@ -173,6 +191,84 @@ export default function ManagementPage() {
     if (res.ok) { setSiswaMsg({ type: 'success', text: `"${deleteTarget.nama}" dihapus.` }); fetchSiswa(); }
     else setSiswaMsg({ type: 'error', text: 'Gagal.' });
     setDeleteLoading(false); setDeleteTarget(null); setTimeout(() => setSiswaMsg(null), 4000);
+  };
+
+  // ---- Guru Edit ----
+  const startEditGuru = (g: GuruItem) => {
+    setEditGuru({ id: g.id, username: g.username, nama: g.nama });
+    setEditGuruUsername(g.username); setEditGuruNama(g.nama); setEditGuruPassword('');
+  };
+  const handleEditGuru = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!editGuru) return;
+    setEditGuruLoading(true); setGuruMsg(null);
+    const body: Record<string, string> = { id: editGuru.id, username: editGuruUsername, nama: editGuruNama };
+    if (editGuruPassword) body.password = editGuruPassword;
+    const res = await fetch('/api/admin/guru', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) setGuruMsg({ type: 'error', text: data.error ?? 'Gagal update guru' });
+    else { setGuruMsg({ type: 'success', text: 'Guru berhasil diperbarui!' }); setEditGuru(null); fetchGuru(); }
+    setEditGuruLoading(false); setTimeout(() => setGuruMsg(null), 5000);
+  };
+
+  // ---- Siswa Edit ----
+  const startEditSiswa = (s: SiswaItem) => {
+    setEditSiswa(s); setEditSiswaNis(s.nis); setEditSiswaNama(s.nama); setEditSiswaUsername(s.username);
+    setEditSiswaPassword(''); setEditSiswaWa(s.whatsappOrangTua);
+  };
+  const handleEditSiswa = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!editSiswa) return;
+    setEditSiswaLoading(true); setSiswaMsg(null);
+    const body: Record<string, string> = { id: editSiswa.id, nis: editSiswaNis, nama: editSiswaNama, username: editSiswaUsername, whatsappOrangTua: editSiswaWa };
+    if (editSiswaPassword) body.password = editSiswaPassword;
+    const res = await fetch('/api/admin/siswa', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) setSiswaMsg({ type: 'error', text: data.error ?? 'Gagal update siswa' });
+    else { setSiswaMsg({ type: 'success', text: 'Siswa berhasil diperbarui!' }); setEditSiswa(null); fetchSiswa(); }
+    setEditSiswaLoading(false); setTimeout(() => setSiswaMsg(null), 5000);
+  };
+
+  // ---- Export PDF ----
+  const exportGuruPDF = async () => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+    const doc = new jsPDF();
+    const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    doc.setFont('Helvetica', 'bold'); doc.setFontSize(14); doc.text('DAFTAR GURU', 14, 20);
+    doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100);
+    doc.text(`Sistem Informasi Akademik — RekapKelas`, 14, 27);
+    doc.text(`Tanggal Cetak: ${today}`, 14, 33);
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.3); doc.line(14, 36, 196, 36);
+    const startY = 42;
+    autoTable(doc, {
+      startY,
+      head: [['No', 'Nama', 'Username', 'Password']],
+      body: guruList.map((g, i) => [i + 1, g.nama, g.username, g.passwordPlain || '']),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [30, 41, 59] },
+    });
+    doc.save('daftar-guru.pdf');
+  };
+  const exportSiswaPDF = async () => {
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+    const toExport = exportKelasFilter === 'all' ? siswaList : siswaList.filter(s => s.kelasId === exportKelasFilter);
+    const kelasLabel = exportKelasFilter === 'all' ? 'Semua Kelas' : (kelasList.find(k => k.id === exportKelasFilter)?.nama.replace(/-/g, ' ') ?? 'Filter');
+    const doc = new jsPDF();
+    const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    doc.setFont('Helvetica', 'bold'); doc.setFontSize(14); doc.text('DAFTAR SISWA', 14, 20);
+    doc.setFont('Helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100);
+    doc.text(`Sistem Informasi Akademik — RekapKelas`, 14, 27);
+    doc.text(`Kelas: ${kelasLabel}`, 14, 33);
+    doc.text(`Tanggal Cetak: ${today}`, 14, 39);
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.3); doc.line(14, 42, 196, 42);
+    const startY = 48;
+    autoTable(doc, {
+      startY,
+      head: [['No', 'NIS', 'Nama', 'Username', 'Password', 'WA Ortu']],
+      body: toExport.map((s, i) => [i + 1, s.nis, s.nama, s.username, s.passwordPlain || '', s.whatsappOrangTua || '-']),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [30, 41, 59] },
+    });
+    const label = exportKelasFilter === 'all' ? 'semua-kelas' : (kelasList.find(k => k.id === exportKelasFilter)?.nama ?? 'filter');
+    doc.save(`daftar-siswa-${label}.pdf`);
   };
 
   const handleAddSiswa = async (e: React.FormEvent) => {
@@ -285,7 +381,13 @@ export default function ManagementPage() {
       {activeTab === 'guru' && (
         <div className="space-y-5 animate-fade-in">
           <div className="glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div><h2 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Akun Guru</h2><p className="text-[var(--text-muted)] text-xs mt-0.5">Lihat dan hapus akun guru.</p></div>
+            <div><h2 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Akun Guru</h2><p className="text-[var(--text-muted)] text-xs mt-0.5">Lihat, edit, dan kelola akun guru.</p></div>
+            <div className="flex gap-3">
+              <button onClick={exportGuruPDF} className="btn ml-auto px-4 py-2.5 text-xs font-bold border border-[var(--border-default)] hover:bg-[var(--bg-glass-hover)] transition-all rounded-[var(--radius-pill)]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                Export PDF
+              </button>
+            </div>
           </div>
           {guruMsg && <div className={`p-4 rounded-[var(--radius-input)] text-sm font-semibold border animate-slide-down ${guruMsg.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>{guruMsg.text}</div>}
           <div className="glass-card overflow-hidden">
@@ -295,31 +397,75 @@ export default function ManagementPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="table-premium">
-                <thead><tr><th>Username</th><th>Nama</th><th>Kelas</th><th className="text-center">Aksi</th></tr></thead>
+                <thead><tr><th>Username</th><th>Nama</th><th>Kelas</th><th>Password</th><th className="text-center">Aksi</th></tr></thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
-                  {guruList.length === 0 && !guruLoading ? (<tr><td colSpan={4} className="p-10 text-center text-[var(--text-muted)] text-sm">Belum ada data.</td></tr>)
+                  {guruList.length === 0 && !guruLoading ? (<tr><td colSpan={5} className="p-10 text-center text-[var(--text-muted)] text-sm">Belum ada data.</td></tr>)
                   : guruList.map((g) => (
                     <tr key={g.id} className="hover:bg-[var(--bg-glass)] transition-colors">
                       <td className="font-mono">{g.username}</td>
                       <td><span className="font-semibold text-[var(--text-primary)] text-sm">{g.nama}</span></td>
                       <td>{g.kelas?.nama?.replace(/-/g, ' ') || '-'}</td>
-                      <td className="text-center"><button onClick={() => setDeleteTarget({ id: g.id, nama: g.nama, type: 'guru' })} className="btn-danger px-3 py-1.5 text-xs font-bold">Hapus</button></td>
+                      <td>
+                        <div className="flex items-center gap-2 font-mono text-sm">
+                          <span>{visibleGuruPassword[g.id] ? (g.passwordPlain || '-') : '•'.repeat(8)}</span>
+                          <button onClick={() => setVisibleGuruPassword(prev => ({ ...prev, [g.id]: !prev[g.id] }))} className="btn-ghost w-6 h-6 rounded-[var(--radius-pill)] grid place-items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all" title={visibleGuruPassword[g.id] ? 'Sembunyikan' : 'Lihat'}>
+                            {visibleGuruPassword[g.id] ? (
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+                            ) : (
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => startEditGuru(g)} className="px-3 py-1.5 text-xs font-bold rounded-[var(--radius-pill)] bg-[var(--bg-glass)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-glass-hover)] hover:text-[var(--text-primary)] transition-all">Edit</button>
+                          <button onClick={() => setDeleteTarget({ id: g.id, nama: g.nama, type: 'guru' })} className="btn-danger px-3 py-1.5 text-xs font-bold">Hapus</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {/* Guru Edit Modal */}
+          <Modal open={editGuru !== null} onClose={() => setEditGuru(null)} title="Edit Guru">
+            <form onSubmit={handleEditGuru} className="space-y-4">
+              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Username *</label>
+                <input type="text" value={editGuruUsername} onChange={(e) => setEditGuruUsername(e.target.value)} required className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Nama *</label>
+                <input type="text" value={editGuruNama} onChange={(e) => setEditGuruNama(e.target.value)} required className="glass-input w-full p-2.5 text-sm" /></div>
+              <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Password</label>
+                <input type="text" value={editGuruPassword} onChange={(e) => setEditGuruPassword(e.target.value)} placeholder="Kosongkan jika tidak diubah" minLength={6} className="glass-input w-full p-2.5 text-sm font-mono" />
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">Min. 6 karakter. Kosongkan jika tidak ingin mengubah password.</p></div>
+              <div className="flex gap-3 justify-end pt-2 border-t border-[var(--border-subtle)]">
+                <button type="button" onClick={() => setEditGuru(null)} className="btn btn-secondary px-4 py-2 text-sm">Batal</button>
+                <button type="submit" disabled={editGuruLoading} className="btn-primary px-6 py-2 text-sm">{editGuruLoading ? 'Menyimpan...' : 'Simpan'}</button>
+              </div>
+            </form>
+          </Modal>
         </div>
       )}
 
       {activeTab === 'siswa' && (
         <div className="space-y-5 animate-fade-in">
           <div className="glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div><h2 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Akun Siswa</h2><p className="text-[var(--text-muted)] text-xs mt-0.5">Tambah, lihat, atau hapus akun siswa.</p></div>
-            <button onClick={() => setShowAddSiswa(true)} className="btn-primary px-5 py-2.5 text-sm font-bold">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" /></svg>Tambah Siswa
-            </button>
+            <div><h2 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Akun Siswa</h2><p className="text-[var(--text-muted)] text-xs mt-0.5">Tambah, edit, lihat, atau hapus akun siswa.</p></div>
+            <div className="flex items-center gap-3">
+              <select value={exportKelasFilter} onChange={(e) => setExportKelasFilter(e.target.value)} className="glass-select p-2.5 text-xs font-semibold">
+                <option value="all">Semua Kelas</option>
+                {kelasList.map((k) => (<option key={k.id} value={k.id}>{k.nama.replace(/-/g, ' ')}</option>))}
+              </select>
+              <button onClick={exportSiswaPDF} className="btn px-4 py-2.5 text-xs font-bold border border-[var(--border-default)] hover:bg-[var(--bg-glass-hover)] transition-all rounded-[var(--radius-pill)]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                Export PDF
+              </button>
+              <button onClick={() => setShowAddSiswa(true)} className="btn-primary px-5 py-2.5 text-sm font-bold">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" /></svg>Tambah Siswa
+              </button>
+            </div>
           </div>
 
           <div className="glass-card p-4">
@@ -356,24 +502,63 @@ export default function ManagementPage() {
             </div>
             <div className="overflow-x-auto">
               <table className="table-premium">
-                <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Username</th><th className="hidden md:table-cell">WA Ortu</th><th className="text-center">Aksi</th></tr></thead>
+                <thead><tr><th>NIS</th><th>Nama</th><th>Kelas</th><th>Username</th><th>Password</th><th className="hidden md:table-cell">WA Ortu</th><th className="text-center">Aksi</th></tr></thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
                   {filteredSiswa.length === 0 && !siswaLoading ? (
-                    <tr><td colSpan={6} className="p-10 text-center text-[var(--text-muted)] text-sm">Belum ada data.</td></tr>
+                    <tr><td colSpan={7} className="p-10 text-center text-[var(--text-muted)] text-sm">Belum ada data.</td></tr>
                   ) : filteredSiswa.map((s) => (
                     <tr key={s.id} className="hover:bg-[var(--bg-glass)] transition-colors">
                       <td className="font-mono">{s.nis}</td>
                       <td><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-[var(--radius-pill)] bg-[var(--bg-glass)] flex items-center justify-center text-[var(--text-secondary)] font-bold text-xs">{s.nama.charAt(0)}</div><span className="font-semibold text-[var(--text-primary)] text-sm">{s.nama}</span></div></td>
                       <td>{s.kelas.nama.replace(/-/g, ' ')}</td>
                       <td className="font-mono">{s.username}</td>
+                      <td>
+                        <div className="flex items-center gap-2 font-mono text-sm">
+                          <span>{visibleSiswaPassword[s.id] ? (s.passwordPlain || '-') : '•'.repeat(8)}</span>
+                          <button onClick={() => setVisibleSiswaPassword(prev => ({ ...prev, [s.id]: !prev[s.id] }))} className="btn-ghost w-6 h-6 rounded-[var(--radius-pill)] grid place-items-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all" title={visibleSiswaPassword[s.id] ? 'Sembunyikan' : 'Lihat'}>
+                            {visibleSiswaPassword[s.id] ? (
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+                            ) : (
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                            )}
+                          </button>
+                        </div>
+                      </td>
                       <td className="hidden md:table-cell font-mono text-[var(--text-muted)]">{s.whatsappOrangTua || '-'}</td>
-                      <td className="text-center"><button onClick={() => setDeleteTarget({ id: s.id, nama: s.nama, type: 'siswa' })} className="btn-danger px-3 py-1.5 text-xs font-bold">Hapus</button></td>
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => startEditSiswa(s)} className="px-3 py-1.5 text-xs font-bold rounded-[var(--radius-pill)] bg-[var(--bg-glass)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-glass-hover)] hover:text-[var(--text-primary)] transition-all">Edit</button>
+                          <button onClick={() => setDeleteTarget({ id: s.id, nama: s.nama, type: 'siswa' })} className="btn-danger px-3 py-1.5 text-xs font-bold">Hapus</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {/* Siswa Edit Modal */}
+          <Modal open={editSiswa !== null} onClose={() => setEditSiswa(null)} title="Edit Siswa">
+            <form onSubmit={handleEditSiswa} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">NIS *</label>
+                  <input type="text" value={editSiswaNis} onChange={(e) => setEditSiswaNis(e.target.value)} required className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Nama *</label>
+                  <input type="text" value={editSiswaNama} onChange={(e) => setEditSiswaNama(e.target.value)} required className="glass-input w-full p-2.5 text-sm" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Username *</label>
+                  <input type="text" value={editSiswaUsername} onChange={(e) => setEditSiswaUsername(e.target.value)} required className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+                <div><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Password</label>
+                  <input type="text" value={editSiswaPassword} onChange={(e) => setEditSiswaPassword(e.target.value)} placeholder="Kosongkan jika tidak diubah" minLength={6} className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+                <div className="md:col-span-2"><label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">WA Ortu (628xxx)</label>
+                  <input type="text" value={editSiswaWa} onChange={(e) => setEditSiswaWa(e.target.value)} placeholder="6281234567890" className="glass-input w-full p-2.5 text-sm font-mono" /></div>
+              </div>
+              <div className="flex gap-3 justify-end pt-2 border-t border-[var(--border-subtle)]">
+                <button type="button" onClick={() => setEditSiswa(null)} className="btn btn-secondary px-4 py-2 text-sm">Batal</button>
+                <button type="submit" disabled={editSiswaLoading} className="btn-primary px-6 py-2 text-sm">{editSiswaLoading ? 'Menyimpan...' : 'Simpan'}</button>
+              </div>
+            </form>
+          </Modal>
         </div>
       )}
 

@@ -20,17 +20,22 @@ export async function GET(req: NextRequest) {
       where: { siswaId: { in: siswaIds }, statusApproval: 'APPROVED', kehadiran: { tanggal: targetDate } },
     });
 
+    const pendingIzin = await prisma.izin.findMany({
+      where: { siswaId: { in: siswaIds }, statusApproval: 'PENDING', kehadiran: { tanggal: targetDate } },
+      select: { siswaId: true },
+    });
+    const izinStatus = new Map<string, string>();
+    for (const i of pendingIzin) izinStatus.set(i.siswaId, 'PENDING');
+    for (const i of approvedIzin) izinStatus.set(i.siswaId, 'APPROVED');
+
     const students = guru.kelas.siswa.map(s => {
       const k = km.get(s.id);
-      const approved = approvedIzin.find(i => i.siswaId === s.id);
-      if (approved) {
-        const status = approved.alasan ? 'IZIN' : 'SAKIT';
-        return { id: s.id, nis: s.nis, nama: s.nama, whatsappOrangTua: s.whatsappOrangTua, status: k?.status || status as any, alasan: k?.izin?.alasan || approved.alasan || '', buktiUrl: k?.izin?.buktiFoto || approved.buktiFoto || '', izinAuto: true };
-      }
-      return { id: s.id, nis: s.nis, nama: s.nama, whatsappOrangTua: s.whatsappOrangTua, status: k?.status || 'BELUM', alasan: k?.izin?.alasan || '', buktiUrl: k?.izin?.buktiFoto || '', izinAuto: false };
+      const izinSt = izinStatus.get(s.id);
+      return { id: s.id, nis: s.nis, nama: s.nama, whatsappOrangTua: s.whatsappOrangTua, status: k?.status || 'BELUM', alasan: k?.izin?.alasan || '', buktiUrl: k?.izin?.buktiFoto || '', izinAuto: false, hasPending: izinSt === 'PENDING', hasApprovedIzin: izinSt === 'APPROVED' };
     });
 
-    const alreadySubmitted = kehadiranList.length === siswaIds.length;
+    // ponytail: always show the form; success only from POST
+    const alreadySubmitted = false;
     return NextResponse.json({ kelas: { id: guru.kelas.id, nama: guru.kelas.nama, waliKelas: guru.kelas.waliKelas }, students, alreadySubmitted });
   } catch (e) {
     console.error(e);

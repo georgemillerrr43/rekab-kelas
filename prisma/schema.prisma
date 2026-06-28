@@ -30,14 +30,15 @@ model Admin {
 }
 
 model Guru {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  password  String   // Hashed password
-  nama      String
-  kelasId   String   @unique
-  kelas     Kelas    @relation(fields: [kelasId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(uuid())
+  username      String   @unique
+  password      String   // Hashed password
+  passwordPlain String?  // Plaintext password (for admin reference only)
+  nama          String
+  kelasId       String   @unique
+  kelas         Kelas    @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Kelas {
@@ -59,6 +60,7 @@ model Siswa {
   whatsappOrangTua String
   username         String      @unique
   password         String
+  passwordPlain    String?     // Plaintext password (for admin reference only)
   kehadiran        Kehadiran[]
   izin             Izin[]
   createdAt        DateTime    @default(now())

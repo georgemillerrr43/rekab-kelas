@@ -31,8 +31,8 @@ export default function SiswaDashboard() {
       const res = await fetch('/api/siswa/izin');
       if (res.status === 403) { router.push('/login'); return; }
       const data = await res.json();
-      setStats(data.stats); setIzinList(data.izinList);
-    } catch { /* ignore */ } finally { setIsLoading(false); }
+      if (data.stats && data.izinList) { setStats(data.stats); setIzinList(data.izinList); }
+    } catch { /* ponytail: keep defaults on error */ } finally { setIsLoading(false); }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,9 +129,8 @@ export default function SiswaDashboard() {
 
         {/* ponytail: inline form — expands/collapses via grid-rows transition instead of a modal */}
         <div
-          className={`grid transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-            showForm ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-          }`}
+          className={`grid transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${showForm ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+            }`}
         >
           <div className="overflow-hidden">
             <div className="mt-4 p-5 rounded-[var(--radius-card)] border border-[var(--accent-border)] bg-gradient-to-br from-[rgba(99,102,241,0.04)] to-[rgba(139,92,246,0.08)] relative">

@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 type Status = 'HADIR' | 'IZIN' | 'SAKIT' | 'ALPA';
 interface Student { id: string; nis: string; nama: string; status: Status; alasan?: string; buktiUrl?: string; buktiPreview?: string; uploadError?: string; }
 
 export default function GuruAttendanceForm() {
+  const router = useRouter();
   const [tanggal, setTanggal] = useState(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -146,7 +148,7 @@ export default function GuruAttendanceForm() {
                     {students.map(s => (
                       <tr key={s.id} className="hover:bg-[var(--bg-glass)] transition-colors">
                         <td className="text-center font-mono">{s.nis}</td>
-                        <td><span className="font-semibold text-[var(--text-primary)] text-sm">{s.nama}</span></td>
+                        <td><span className="font-semibold text-[var(--text-primary)] text-sm">{s.nama}{(s as any).hasPending && <button type="button" onClick={() => router.push('/approval')} className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(245,158,11,0.12)] text-[var(--warning)] border border-[rgba(245,158,11,0.2)] hover:bg-[rgba(245,158,11,0.2)] transition-colors">Izin Diajukan</button>}{(s as any).hasApprovedIzin && <button type="button" onClick={() => router.push('/approval')} className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(34,197,94,0.12)] text-[var(--bullish)] border border-[rgba(34,197,94,0.2)] hover:bg-[rgba(34,197,94,0.18)] transition-colors">Izin Disetujui</button>}</span></td>
                         <td><div className="flex justify-center gap-1.5">{statusBtns(s.id, s.status, 'row')}</div></td>
                         <td>{renderDetail(s)}</td>
                       </tr>
@@ -159,7 +161,7 @@ export default function GuruAttendanceForm() {
               <div className="md:hidden space-y-4">
                 {students.map(s => (
                   <div key={s.id} className="p-4 glass rounded-[var(--radius-card)] space-y-3">
-                    <p className="font-bold text-[var(--text-primary)] text-sm">{s.nama}</p>
+                    <p className="font-bold text-[var(--text-primary)] text-sm">{s.nama}{(s as any).hasPending && <button type="button" onClick={() => router.push('/approval')} className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(245,158,11,0.12)] text-[var(--warning)] border border-[rgba(245,158,11,0.2)] hover:bg-[rgba(245,158,11,0.2)] transition-colors">Izin Diajukan</button>}{(s as any).hasApprovedIzin && <button type="button" onClick={() => router.push('/approval')} className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(34,197,94,0.12)] text-[var(--bullish)] border border-[rgba(34,197,94,0.2)] hover:bg-[rgba(34,197,94,0.18)] transition-colors">Izin Disetujui</button>}</p>
                     <p className="text-[var(--text-muted)] text-xs">NIS: {s.nis}</p>
                     <div className="grid grid-cols-4 gap-1.5">{statusBtns(s.id, s.status, 'grid')}</div>
                     {renderDetail(s)}

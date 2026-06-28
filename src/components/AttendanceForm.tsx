@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 interface Siswa { id: string; nis: string; nama: string; whatsappOrangTua: string; }
 interface Kelas { id: string; nama: string; waliKelas: string; }
@@ -12,6 +12,7 @@ interface StudentState {
 }
 
 function AttendanceFormInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [kelasList, setKelasList] = useState<Kelas[]>([]);
   const [kelas, setKelas] = useState<string>(searchParams.get('kelas') || '');
@@ -184,7 +185,7 @@ function AttendanceFormInner() {
                   <tbody className="divide-y divide-[var(--border-subtle)]">
                     {students.map((s) => {
                       const state = attendance[s.id] || { status: 'HADIR' as const };
-                      return (<tr key={s.id} className="hover:bg-[var(--bg-glass)] transition-colors"><td className="text-center font-mono">{s.nis}</td><td><p className="font-semibold text-[var(--text-primary)] text-sm">{s.nama}</p><p className="text-[var(--text-muted)] text-xs">WA: {s.whatsappOrangTua}</p></td><td><div className="flex justify-center gap-1.5">{btnRow(s.id, state)}</div></td><td>{renderDetail(s.id, state)}</td></tr>);
+                      return (<tr key={s.id} className="hover:bg-[var(--bg-glass)] transition-colors"><td className="text-center font-mono">{s.nis}</td><td><p className="font-semibold text-[var(--text-primary)] text-sm">{s.nama}{(s as any).hasPending && <button type="button" onClick={() => router.push('/approval')} className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(245,158,11,0.12)] text-[var(--warning)] border border-[rgba(245,158,11,0.2)] hover:bg-[rgba(245,158,11,0.2)] transition-colors">Izin Diajukan</button>}{(s as any).hasApprovedIzin && <button type="button" onClick={() => router.push('/approval')} className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(34,197,94,0.12)] text-[var(--bullish)] border border-[rgba(34,197,94,0.2)] hover:bg-[rgba(34,197,94,0.18)] transition-colors">Izin Disetujui</button>}</p><p className="text-[var(--text-muted)] text-xs">WA: {s.whatsappOrangTua}</p></td><td><div className="flex justify-center gap-1.5">{btnRow(s.id, state)}</div></td><td>{renderDetail(s.id, state)}</td></tr>);
                     })}
                   </tbody>
                 </table>
@@ -193,7 +194,7 @@ function AttendanceFormInner() {
               <div className="md:hidden space-y-4">
                 {students.map((s) => {
                   const state = attendance[s.id] || { status: 'HADIR' as const };
-                  return (<div key={s.id} className="p-4 glass rounded-[var(--radius-card)] space-y-3"><div className="flex justify-between items-start"><div><p className="font-bold text-[var(--text-primary)] text-sm">{s.nama}</p><p className="text-[var(--text-muted)] text-xs">NIS: {s.nis}</p></div></div><div className="grid grid-cols-4 gap-1.5">{btnRowMobile(s.id, state)}</div>{renderDetail(s.id, state)}</div>);
+                  return (<div key={s.id} className="p-4 glass rounded-[var(--radius-card)] space-y-3"><div className="flex justify-between items-start"><div><p className="font-bold text-[var(--text-primary)] text-sm">{s.nama}{(s as any).hasPending && <button type="button" onClick={() => router.push('/approval')} className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(245,158,11,0.12)] text-[var(--warning)] border border-[rgba(245,158,11,0.2)] hover:bg-[rgba(245,158,11,0.2)] transition-colors">Izin Diajukan</button>}{(s as any).hasApprovedIzin && <button type="button" onClick={() => router.push('/approval')} className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(34,197,94,0.12)] text-[var(--bullish)] border border-[rgba(34,197,94,0.2)] hover:bg-[rgba(34,197,94,0.18)] transition-colors">Izin Disetujui</button>}</p><p className="text-[var(--text-muted)] text-xs">NIS: {s.nis}</p></div></div><div className="grid grid-cols-4 gap-1.5">{btnRowMobile(s.id, state)}</div>{renderDetail(s.id, state)}</div>);
                 })}
               </div>
             </>

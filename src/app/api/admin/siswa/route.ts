@@ -15,14 +15,9 @@ export async function GET(request: NextRequest) {
       nis: true,
       nama: true,
       kelasId: true,
-      kelas: {
-        select: {
-          id: true,
-          nama: true,
-          waliKelas: true,
-        },
-      },
+      kelas: { select: { id: true, nama: true, waliKelas: true } },
       username: true,
+      passwordPlain: true,
       whatsappOrangTua: true,
       createdAt: true,
     },
@@ -72,11 +67,10 @@ export async function POST(request: NextRequest) {
         kelasId,
         username,
         password: await hashPassword(password),
+        passwordPlain: password,
         whatsappOrangTua: whatsappOrangTua || '',
       },
-      include: {
-        kelas: true,
-      },
+      include: { kelas: true },
     });
 
     return NextResponse.json({
@@ -88,11 +82,64 @@ export async function POST(request: NextRequest) {
         kelasId: siswa.kelasId,
         kelas: siswa.kelas,
         username: siswa.username,
+        passwordPlain: siswa.passwordPlain,
       },
     });
   } catch (error: any) {
     console.error('Error menambah siswa:', error);
     return NextResponse.json({ error: 'Gagal menyimpan data siswa ke database.' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  const session = getSession(request);
+  if (!session || session.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Akses ditolak. Hanya Admin.' }, { status: 403 });
+  }
+
+  try {
+    const { id, nis, nama, username, password, whatsappOrangTua } = await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID siswa wajib disertakan.' }, { status: 400 });
+    }
+
+    const existing = await prisma.siswa.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: 'Siswa tidak ditemukan.' }, { status: 404 });
+    }
+
+    if (nis && nis !== existing.nis) {
+      const dupNis = await prisma.siswa.findUnique({ where: { nis } });
+      if (dupNis) return NextResponse.json({ error: 'NIS sudah digunakan!' }, { status: 409 });
+    }
+
+    if (username && username !== existing.username) {
+      const dupUser = await prisma.siswa.findUnique({ where: { username } });
+      if (dupUser) return NextResponse.json({ error: 'Username sudah digunakan!' }, { status: 409 });
+    }
+
+    const data: any = {};
+    if (nis) data.nis = nis;
+    if (nama) data.nama = nama;
+    if (username) data.username = username;
+    if (whatsappOrangTua !== undefined) data.whatsappOrangTua = whatsappOrangTua;
+    if (password) {
+      if (password.length < 6) return NextResponse.json({ error: 'Password minimal 6 karakter!' }, { status: 400 });
+      data.password = await hashPassword(password);
+      data.passwordPlain = password;
+    }
+
+    const updated = await prisma.siswa.update({
+      where: { id },
+      data,
+      include: { kelas: true },
+    });
+
+    return NextResponse.json({ success: true, siswa: updated });
+  } catch (error: any) {
+    console.error('Error update siswa:', error);
+    return NextResponse.json({ error: 'Gagal mengupdate data siswa.' }, { status: 500 });
   }
 }
 

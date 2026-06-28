@@ -77,6 +77,7 @@ async function main() {
         whatsappOrangTua: siswa.whatsappOrangTua,
         username: siswa.nis,
         password: siswaPassword,
+        passwordPlain: 'siswa123',
       },
     });
     console.log(`  ✓ ${siswa.nis} - ${siswa.nama} (${siswa.kelas})`);

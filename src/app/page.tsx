@@ -25,7 +25,8 @@ export default function AdminDashboard() {
     try {
       const statsRes = await fetch('/api/admin/stats');
       if (statsRes.status === 403) { router.push('/login'); return; }
-      setStats(await statsRes.json());
+      const statsData = await statsRes.json();
+      if (!statsData.error) setStats(statsData);
       const appRes = await fetch('/api/admin/approval');
       const appData = await appRes.json();
       setApprovals((appData.requests || []).filter((r: any) => r.status === 'PENDING'));

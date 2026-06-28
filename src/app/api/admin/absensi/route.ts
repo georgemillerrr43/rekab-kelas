@@ -38,34 +38,27 @@ export async function GET(request: NextRequest) {
       include: { izin: true },
     });
 
-    // Look up approved izin for this date
-    const approvedIzin = await prisma.izin.findMany({
-      where: {
-        siswaId: { in: studentIds },
-        statusApproval: 'APPROVED',
-        kehadiran: { tanggal: targetDate },
-      },
+    // ponytail: check izin status — approved / pending, but never auto-set student status
+    const allIzin = await prisma.izin.findMany({
+      where: { siswaId: { in: studentIds }, kehadiran: { tanggal: targetDate } },
+      select: { siswaId: true, statusApproval: true },
     });
+    const izinStatus = new Map<string, string>();
+    for (const i of allIzin) izinStatus.set(i.siswaId, i.statusApproval);
 
     const result = students.map((siswa) => {
       const khd = kehadiran.find((k) => k.siswaId === siswa.id);
-      const approved = approvedIzin.find((i) => i.siswaId === siswa.id);
-      if (approved) {
-        const status = approved.alasan ? 'IZIN' : 'SAKIT';
-        return {
-          id: siswa.id, nis: siswa.nis, nama: siswa.nama, whatsappOrangTua: siswa.whatsappOrangTua,
-          status: khd?.status || status as any, alasan: khd?.izin?.alasan || approved.alasan || '',
-          buktiUrl: khd?.izin?.buktiFoto || approved.buktiFoto || '', izinAuto: true,
-        };
-      }
+      const izinSt = izinStatus.get(siswa.id);
       return {
         id: siswa.id, nis: siswa.nis, nama: siswa.nama, whatsappOrangTua: siswa.whatsappOrangTua,
         status: khd?.status || 'BELUM', alasan: khd?.izin?.alasan || '', buktiUrl: khd?.izin?.buktiFoto || '',
-        izinAuto: false,
+        izinAuto: false, hasPending: izinSt === 'PENDING',
+        hasApprovedIzin: izinSt === 'APPROVED',
       };
     });
 
-    const alreadySubmitted = kehadiran.length > 0;
+    // ponytail: always show the form; success screen only triggered by POST submit
+    const alreadySubmitted = false;
     return NextResponse.json({ students: result, alreadySubmitted });
   } catch (error) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -123,6 +116,7 @@ export async function POST(request: NextRequest) {
           });
         }
       } else if (status === 'IZIN' || status === 'SAKIT') {
+        // ponytail: izin/sakit from teacher = PENDING, not auto-approved
         let newIzin;
         if (existingKhd?.izinId) {
           newIzin = await prisma.izin.update({
@@ -130,7 +124,7 @@ export async function POST(request: NextRequest) {
             data: {
               alasan: alasan || '',
               buktiFoto: buktiUrl || '',
-              statusApproval: 'APPROVED',
+              statusApproval: 'PENDING',
             },
           });
         } else {
@@ -139,7 +133,7 @@ export async function POST(request: NextRequest) {
               siswaId,
               alasan: alasan || '',
               buktiFoto: buktiUrl || '',
-              statusApproval: 'APPROVED',
+              statusApproval: 'PENDING',
             },
           });
         }
