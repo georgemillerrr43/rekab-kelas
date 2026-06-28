@@ -73,30 +73,6 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.alpa - a.alpa)
       .slice(0, 4);
 
-    const getDayPercentage = (offset: number) => {
-      const d = new Date(today);
-      const currentDay = d.getDay();
-      const distance = offset - currentDay;
-      d.setDate(d.getDate() + distance);
-      const dateStr = d.toISOString().split('T')[0];
-
-      const dayKhd = monthlyKehadiran.filter((k) => {
-        const kd = k.tanggal.toISOString().split('T')[0];
-        return kd === dateStr;
-      });
-      if (dayKhd.length === 0) return -1;
-      const h = dayKhd.filter((k) => k.status === 'HADIR').length;
-      return Math.round((h / dayKhd.length) * 100);
-    };
-
-    const dataMingguan = [
-      { hari: 'Senin', persen: getDayPercentage(1) },
-      { hari: 'Selasa', persen: getDayPercentage(2) },
-      { hari: 'Rabu', persen: getDayPercentage(3) },
-      { hari: 'Kamis', persen: getDayPercentage(4) },
-      { hari: 'Jumat', persen: getDayPercentage(5) },
-    ].filter(d => d.persen >= 0);
-
     return NextResponse.json({
       avgAttendance,
       todayStats,
@@ -104,7 +80,6 @@ export async function GET(request: NextRequest) {
       totalStudents,
       topAbsentees,
       distribution,
-      dataMingguan,
     });
   } catch (error) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

@@ -125,7 +125,7 @@ export default function GuruApprovalPage() {
       </div>
 
       {selectedPhoto && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="relative glass rounded-[var(--radius-card)] overflow-hidden max-w-2xl w-full shadow-2xl">
             <button onClick={() => setSelectedPhoto(null)}
               className="absolute right-4 top-4 p-2 bg-black/60 text-white hover:bg-black/80 rounded-[var(--radius-pill)] transition-colors z-10">
