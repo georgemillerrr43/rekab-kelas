@@ -28,15 +28,14 @@ const dataSiswa = [
 ];
 
 async function main() {
-  console.log('🔄 Memulai pembersihan database (cleanup)...');
+  console.log('Membersihkan database...');
   await prisma.kehadiran.deleteMany({});
   await prisma.izin.deleteMany({});
   await prisma.siswa.deleteMany({});
   await prisma.kelas.deleteMany({});
   await prisma.admin.deleteMany({});
-  console.log('✅ Database cleaned');
 
-  console.log('\n👤 Membuat akun Admin default...');
+  console.log('\nMembuat akun Admin...');
   const adminPassword = await hashPassword('admin123');
   await prisma.admin.create({
     data: {
@@ -45,30 +44,25 @@ async function main() {
       nama: 'Budi Setiawan, S.Pd.',
     },
   });
-  console.log('✅ Admin berhasil dibuat (admin / admin123)');
 
-  console.log('\n🏫 Membuat data Kelas...');
+  console.log('\nMembuat data Kelas...');
   const kelasMap = new Map<string, string>();
   for (const kelas of dataKelas) {
     const created = await prisma.kelas.create({
-      data: {
-        nama: kelas.nama,
-        waliKelas: kelas.waliKelas,
-      },
+      data: { nama: kelas.nama, waliKelas: kelas.waliKelas },
     });
     kelasMap.set(kelas.nama, created.id);
-    console.log(`  ✓ ${kelas.nama} (${kelas.waliKelas})`);
   }
 
-  console.log('\n👨‍🎓 Membuat akun Siswa & login...');
+  console.log('\nMembuat akun Siswa...');
+  const siswaPassword = await hashPassword('siswa123');
   for (const siswa of dataSiswa) {
     const kelasId = kelasMap.get(siswa.kelas);
     if (!kelasId) {
-      console.error(`  ✗ Kelas ${siswa.kelas} tidak ditemukan!`);
+      console.error(`Kelas ${siswa.kelas} tidak ditemukan`);
       continue;
     }
 
-    const siswaPassword = await hashPassword('siswa123');
     await prisma.siswa.create({
       data: {
         nis: siswa.nis,
@@ -80,13 +74,11 @@ async function main() {
         passwordPlain: 'siswa123',
       },
     });
-    console.log(`  ✓ ${siswa.nis} - ${siswa.nama} (${siswa.kelas})`);
   }
 
-  console.log('\n✨ Seeding database selesai sukses!');
-  console.log('\n📝 Akun yang tersedia:');
+  console.log('\nSeeding selesai! Akun:');
   console.log('  Admin: admin / admin123');
-  console.log('  Siswa: [NIS] / siswa123 (contoh: 10001 / siswa123)');
+  console.log('  Siswa: [NIS] / siswa123');
 }
 
 main()
