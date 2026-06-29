@@ -145,7 +145,7 @@ export default function ManagementPage() {
       body: JSON.stringify({ nama: newKNama, waliKelas: newWKelas, guruUsername: guruUsername || undefined, guruPassword: guruPassword || undefined }),
     });
     const data = await res.json();
-    if (!res.ok) setKelasMsg({ type: 'error', text: data.error });
+    if (!res.ok) setKelasMsg({ type: 'error', text: data.error || 'Gagal menambah kelas' });
     else { setKelasMsg({ type: 'success', text: `Kelas "${newKNama}" berhasil ditambahkan!` }); setNewKNama(''); setNewWKelas(''); setGuruUsername(''); setGuruPassword(''); setShowAddKelas(false); fetchKelas(); }
     setAddKelasLoading(false); setTimeout(() => setKelasMsg(null), 5000);
   };
@@ -303,9 +303,11 @@ export default function ManagementPage() {
         <div className="space-y-5 animate-fade-in">
           <div className="glass-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div><h2 className="text-lg font-bold text-[var(--text-primary)]">Manajemen Kelas</h2><p className="text-[var(--text-muted)] text-xs mt-0.5">Tambahkan kelas baru dengan nama guru / wali kelas.</p></div>
+            {kelasList.length > 0 && (
             <button onClick={() => setShowAddKelas(true)} className="btn-primary px-5 py-2.5 text-sm font-bold">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 inline mr-1.5 -mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>Tambah Kelas
             </button>
+            )}
           </div>
 
           {kelasMsg && <div className={`p-4 rounded-[var(--radius-input)] text-sm font-semibold border animate-slide-down ${kelasMsg.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>{kelasMsg.text}</div>}
