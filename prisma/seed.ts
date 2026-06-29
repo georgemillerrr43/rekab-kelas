@@ -28,12 +28,15 @@ const dataSiswa = [
 ];
 
 async function main() {
+  // Hapus data lama (urutan berantai)
   await prisma.kehadiran.deleteMany({});
   await prisma.izin.deleteMany({});
   await prisma.siswa.deleteMany({});
+  await prisma.guru.deleteMany({});
   await prisma.kelas.deleteMany({});
   await prisma.admin.deleteMany({});
 
+  // 1. Buat admin
   const adminPassword = await hashPassword('admin123');
   await prisma.admin.create({
     data: {
@@ -43,6 +46,7 @@ async function main() {
     },
   });
 
+  // 2. Buat kelas
   const kelasMap = new Map<string, string>();
   for (const kelas of dataKelas) {
     const created = await prisma.kelas.create({
@@ -51,6 +55,31 @@ async function main() {
     kelasMap.set(kelas.nama, created.id);
   }
 
+  // 3. Buat akun guru untuk setiap kelas
+  const guruPass = await hashPassword('guru123');
+  const dataGuru = [
+    { username: 'budixirpl1', nama: 'Budi Santoso, S.Pd.', kelas: 'XI-RPL-1' },
+    { username: 'sitinurhaliza', nama: 'Siti Nurhaliza, S.Pd.', kelas: 'XI-RPL-2' },
+    { username: 'ahmadwijaya', nama: 'Ahmad Wijaya, S.Pd.', kelas: 'XII-RPL-1' },
+  ];
+  for (const guru of dataGuru) {
+    const kelasId = kelasMap.get(guru.kelas);
+    if (!kelasId) {
+      console.error(`Kelas ${guru.kelas} tidak ditemukan`);
+      continue;
+    }
+    await prisma.guru.create({
+      data: {
+        username: guru.username,
+        password: guruPass,
+        passwordPlain: 'guru123',
+        nama: guru.nama,
+        kelasId: kelasId,
+      },
+    });
+  }
+
+  // 4. Buat akun siswa
   const siswaPassword = await hashPassword('siswa123');
   for (const siswa of dataSiswa) {
     const kelasId = kelasMap.get(siswa.kelas);
@@ -58,7 +87,6 @@ async function main() {
       console.error(`Kelas ${siswa.kelas} tidak ditemukan`);
       continue;
     }
-
     await prisma.siswa.create({
       data: {
         nis: siswa.nis,
@@ -71,6 +99,9 @@ async function main() {
       },
     });
   }
+
+  // eslint-disable-next-line no-console
+  console.log('Seed selesai!');
 }
 
 main()
