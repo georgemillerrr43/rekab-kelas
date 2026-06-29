@@ -106,6 +106,11 @@ export default function ManagementPage() {
   const [editSiswaWa, setEditSiswaWa] = useState('');
   const [editSiswaLoading, setEditSiswaLoading] = useState(false);
   const [exportKelasFilter, setExportKelasFilter] = useState('all');
+  const [pwForm, setPwForm] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (activeTab === 'kelas') fetchKelas();
@@ -285,6 +290,20 @@ export default function ManagementPage() {
 
   const filteredSiswa = filterKelas === 'all' ? siswaList : siswaList.filter(s => s.kelasId === filterKelas);
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault(); setPwLoading(true); setPwMsg(null);
+    try {
+      const res = await fetch('/api/admin/password', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: pwCurrent, newPassword: pwNew }),
+      });
+      const data = await res.json();
+      if (!res.ok) setPwMsg({ type: 'error', text: data.error });
+      else { setPwMsg({ type: 'success', text: 'Password berhasil diubah!' }); setPwCurrent(''); setPwNew(''); setPwForm(false); }
+    } catch { setPwMsg({ type: 'error', text: 'Gagal' }); }
+    setPwLoading(false); setTimeout(() => setPwMsg(null), 5000);
+  };
+
   return (
     <div className="space-y-6">
       <div className="page-header">
@@ -293,11 +312,34 @@ export default function ManagementPage() {
         <p>Tambahkan kelas dengan nama guru atau wali kelas, dan kelola data siswa.</p>
       </div>
 
-      <div className="tab-switcher animate-fade-in">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="tab-switcher animate-fade-in">
         {(['kelas', 'guru', 'siswa'] as const).map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={activeTab === tab ? 'active' : ''}>{tab === 'kelas' ? 'Kelas' : tab === 'guru' ? 'Guru' : 'Siswa'}</button>
         ))}
+        </div>
+        <button onClick={() => setPwForm(!pwForm)} className="btn px-4 py-2 text-xs font-bold border border-[var(--border-default)] hover:bg-[var(--bg-glass-hover)] transition-all rounded-[var(--radius-pill)]">
+          Ganti Password Admin
+        </button>
       </div>
+
+      {pwForm && (
+        <div className="glass-card p-5 animate-fade-in">
+          <h3 className="font-bold text-[var(--text-primary)] text-sm mb-4">Ganti Password Admin</h3>
+          {pwMsg && <div className={`p-3 rounded-[var(--radius-input)] text-sm font-semibold border mb-4 ${pwMsg.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>{pwMsg.text}</div>}
+          <form onSubmit={handleChangePassword} className="flex flex-col md:flex-row gap-3 items-end">
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Password Lama</label>
+              <input type="password" value={pwCurrent} onChange={(e) => setPwCurrent(e.target.value)} required className="glass-input w-full p-2.5 text-sm" />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Password Baru</label>
+              <input type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} required minLength={6} className="glass-input w-full p-2.5 text-sm" />
+            </div>
+            <button type="submit" disabled={pwLoading} className="btn-primary px-5 py-2.5 text-sm font-bold shrink-0">{pwLoading ? 'Menyimpan...' : 'Simpan'}</button>
+          </form>
+        </div>
+      )}
 
       {activeTab === 'kelas' && (
         <div className="space-y-5 animate-fade-in">
