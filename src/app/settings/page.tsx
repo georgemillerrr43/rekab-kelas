@@ -82,24 +82,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Ganti Username */}
-        <h3 className="font-bold text-[var(--text-primary)] text-sm mb-4">Ganti Username</h3>
-        {unameMsg && (
-          <div className={`p-3 rounded-[var(--radius-input)] text-sm font-semibold border mb-4 ${unameMsg.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>
-            {unameMsg.text}
-          </div>
-        )}
-        <form onSubmit={handleChangeUsername} className="space-y-4 mb-6 pb-6 border-b border-[var(--border-subtle)]">
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Username Baru</label>
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required minLength={3} className="glass-input w-full p-2.5 text-sm" />
-            <p className="text-[10px] text-[var(--text-muted)] mt-1">Minimal 3 karakter.</p>
-          </div>
-          <button type="submit" disabled={unameLoading} className="btn-primary w-full py-2.5 text-sm font-bold">
-            {unameLoading ? 'Menyimpan...' : 'Simpan Username'}
-          </button>
-        </form>
-
         {/* Ganti Password */}
         <h3 className="font-bold text-[var(--text-primary)] text-sm mb-4">Ganti Password</h3>
         {pwMsg && (
