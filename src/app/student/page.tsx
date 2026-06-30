@@ -116,16 +116,18 @@ export default function SiswaDashboard() {
       </div>
 
       <div className="glass-card p-5">
-        <div className="flex justify-between items-center mb-5">
-          <div>
-            <h3 className="font-bold text-[var(--text-primary)] text-sm">Riwayat Pengajuan Izin/Sakit</h3>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">Daftar 10 pengajuan terbaru Anda.</p>
+        <div className="mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-[var(--text-primary)] text-sm">Riwayat Pengajuan Izin/Sakit</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Daftar 10 pengajuan terbaru Anda.</p>
+            </div>
+            <button onClick={() => setShowForm(v => !v)} className={`btn-primary w-full sm:w-auto text-center justify-center px-4 py-2.5 text-xs font-bold transition-all ${showForm ? 'opacity-70' : ''}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-4 h-4 inline mr-1.5 -mt-0.5 transition-transform duration-300 ${showForm ? 'rotate-45' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+              {showForm ? 'Tutup' : 'Ajukan Izin'}
+            </button>
           </div>
-          <button onClick={() => setShowForm(v => !v)} className={`btn-primary px-4 py-2 text-xs font-bold transition-all ${showForm ? 'opacity-70' : ''}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-4 h-4 inline mr-1.5 -mt-0.5 transition-transform duration-300 ${showForm ? 'rotate-45' : ''}`}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            {showForm ? 'Tutup' : 'Ajukan Izin'}
-          </button>
-        </div>
+          </div>
 
         {/* ponytail: inline form — expands/collapses via grid-rows transition instead of a modal */}
         <div

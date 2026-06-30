@@ -130,13 +130,15 @@ export default function GuruAttendanceForm() {
       </div>
 
       {isSuccess ? (
-        <div className="text-center py-12 glass-card">
-          <div className="w-16 h-16 bg-gradient-to-tr from-[var(--bullish)] to-emerald-400 rounded-[var(--radius-pill)] flex items-center justify-center mx-auto mb-4"><svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg></div>
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">Tersimpan!</h2>
-          <p className="text-[var(--text-muted)] text-sm mt-1 mb-6">Kelas Anda - {tanggal}</p>
+        <div className="glass-card max-w-lg mx-auto mt-8 p-8 md:p-12 text-center">
+          <div className="w-20 h-20 bg-gradient-to-tr from-[var(--bullish)] to-emerald-400 rounded-[var(--radius-pill)] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-[var(--bullish)]/20 ring-8 ring-[rgba(34,197,94,0.1)]">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+          </div>
+          <h2 className="text-2xl font-extrabold text-[var(--text-primary)] mb-2">Absensi Tersimpan!</h2>
+          <p className="text-[var(--text-muted)] text-base mb-8">{tanggal}</p>
           <div className="flex flex-col sm:flex-row justify-center gap-3">
-            <button onClick={() => setIsSuccess(false)} className="btn btn-secondary px-5 py-2 text-sm font-bold">Kembali Edit</button>
-            <a href="/recap" className="btn-primary px-5 py-2 text-sm font-bold">Lihat Rekap</a>
+            <button onClick={() => setIsSuccess(false)} className="btn btn-secondary px-6 py-2.5 text-sm font-bold">Kembali Edit</button>
+            <a href="/recap" className="btn-primary px-6 py-2.5 text-sm font-bold">Lihat Rekap</a>
           </div>
         </div>
       ) : (
