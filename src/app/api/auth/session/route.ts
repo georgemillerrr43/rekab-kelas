@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   const session = decryptSession(sessionToken);
   if (session) {
-    return NextResponse.json({ isLoggedIn: true, role: session.role, nama: session.nama });
+    return NextResponse.json({ isLoggedIn: true, role: session.role, nama: session.nama, username: session.username });
   }
 
   return NextResponse.json({ isLoggedIn: false, role: null });

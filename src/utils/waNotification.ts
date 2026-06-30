@@ -67,7 +67,6 @@ export async function sendWhatsAppNotification(payload: WANotificationPayload): 
       body: JSON.stringify({
         target: whatsappOrangTua,
         message: messageText,
-        ...(whatsappOrangTua.startsWith('62') ? { countryCode: '62' } : {}),
       }),
     });
 

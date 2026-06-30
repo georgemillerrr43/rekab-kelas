@@ -6,6 +6,9 @@ export default function SettingsPage() {
   const [session, setSession] = useState<{ isLoggedIn: boolean; role: string | null; nama?: string; username?: string }>({
     isLoggedIn: false, role: null,
   });
+  const [userLoading, setUserLoading] = useState(false);
+  const [userMsg, setUserMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [newUsername, setNewUsername] = useState('');
   const [pwCurrent, setPwCurrent] = useState('');
   const [pwNew, setPwNew] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
@@ -22,6 +25,24 @@ export default function SettingsPage() {
       } catch { /* ignore */ }
     })();
   }, []);
+
+  const handleChangeUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserLoading(true);
+    setUserMsg(null);
+    try {
+      const res = await fetch('/api/auth/username', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newUsername }),
+      });
+      const data = await res.json();
+      if (!res.ok) setUserMsg({ type: 'error', text: data.error });
+      else { setUserMsg({ type: 'success', text: 'Username berhasil diubah!' }); setSession(s => ({ ...s, username: newUsername })); setNewUsername(''); }
+    } catch { setUserMsg({ type: 'error', text: 'Gagal menghubungi server' }); }
+    setUserLoading(false);
+    setTimeout(() => setUserMsg(null), 5000);
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +80,24 @@ export default function SettingsPage() {
             <p className="text-sm text-[var(--text-muted)]">Username: {session.username || '-'}</p>
           </div>
         </div>
+
+        {/* Ganti Username */}
+        <h3 className="font-bold text-[var(--text-primary)] text-sm mb-4">Ganti Username</h3>
+        {userMsg && (
+          <div className={`p-3 rounded-[var(--radius-input)] text-sm font-semibold border mb-4 ${userMsg.type === 'success' ? 'bg-[rgba(34,197,94,0.1)] border-[rgba(34,197,94,0.2)] text-[#4ade80]' : 'bg-[rgba(239,68,68,0.1)] border-[rgba(239,68,68,0.2)] text-[#f87171]'}`}>
+            {userMsg.text}
+          </div>
+        )}
+        <form onSubmit={handleChangeUsername} className="space-y-4 mb-6 pb-6 border-b border-[var(--border-subtle)]">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Username Baru</label>
+            <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} required minLength={3} maxLength={50} className="glass-input w-full p-2.5 text-sm" />
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">Minimal 3 karakter.</p>
+          </div>
+          <button type="submit" disabled={userLoading} className="btn-primary w-full py-2.5 text-sm font-bold">
+            {userLoading ? 'Menyimpan...' : 'Simpan Username Baru'}
+          </button>
+        </form>
 
         {/* Ganti Password */}
         <h3 className="font-bold text-[var(--text-primary)] text-sm mb-4">Ganti Password</h3>
