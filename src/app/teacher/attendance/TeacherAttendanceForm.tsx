@@ -23,14 +23,14 @@ export default function GuruAttendanceForm() {
         if (res.status === 403) return;
         const d = await res.json();
         const studentList = d.students || [];
-        setStudents(studentList.map((s: any) => ({ ...s, buktiUrl: '', buktiPreview: '', uploadError: '' })));
+        setStudents(studentList.map((s: any) => ({ ...s, buktiPreview: s.buktiUrl || '', uploadError: '' })));
         setIsSuccess(!!d.alreadySubmitted);
       } catch { /* ignore */ } finally { setIsLoading(false); }
     })();
   }, [tanggal]);
 
   const handleStatus = (id: string, status: Status) => setStudents(p => p.map(s =>
-    s.id === id ? { ...s, status, ...(status === 'HADIR' || status === 'ALPA' ? { alasan: '', buktiUrl: '', buktiPreview: '', uploadError: '' } : {}) } : s
+    s.id === id ? { ...s, status, ...(status === 'HADIR' || status === 'ALPA' ? { alasan: '', uploadError: '' } : {}) } : s
   ));
   const handleAlasan = (id: string, v: string) => setStudents(p => p.map(s => s.id === id ? { ...s, alasan: v } : s));
 

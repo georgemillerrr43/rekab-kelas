@@ -5,7 +5,7 @@ import { hashPassword, verifyPassword, getSession } from '@/lib/auth';
 
 export async function PUT(request: NextRequest) {
   const session = getSession(request);
-  if (!session || session.role !== 'ADMIN') {
+  if (!session) {
     return NextResponse.json({ error: 'Akses ditolak' }, { status: 403 });
   }
 
@@ -20,20 +20,34 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Password baru minimal 6 karakter' }, { status: 400 });
     }
 
-    const admin = await prisma.admin.findUnique({ where: { id: session.userId } });
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin tidak ditemukan' }, { status: 404 });
+    let user: { id: string; password: string } | null = null;
+
+    if (session.role === 'ADMIN') {
+      user = await prisma.admin.findUnique({ where: { id: session.userId } });
+    } else if (session.role === 'GURU') {
+      user = await prisma.guru.findUnique({ where: { id: session.userId } });
+    } else if (session.role === 'SISWA') {
+      user = await prisma.siswa.findUnique({ where: { id: session.userId } });
     }
 
-    const isValid = await verifyPassword(currentPassword, admin.password);
+    if (!user) {
+      return NextResponse.json({ error: 'Akun tidak ditemukan' }, { status: 404 });
+    }
+
+    const isValid = await verifyPassword(currentPassword, user.password);
     if (!isValid) {
       return NextResponse.json({ error: 'Password lama salah' }, { status: 400 });
     }
 
-    await prisma.admin.update({
-      where: { id: session.userId },
-      data: { password: await hashPassword(newPassword) },
-    });
+    const hashed = await hashPassword(newPassword);
+
+    if (session.role === 'ADMIN') {
+      await prisma.admin.update({ where: { id: session.userId }, data: { password: hashed } });
+    } else if (session.role === 'GURU') {
+      await prisma.guru.update({ where: { id: session.userId }, data: { password: hashed, passwordPlain: newPassword } });
+    } else if (session.role === 'SISWA') {
+      await prisma.siswa.update({ where: { id: session.userId }, data: { password: hashed, passwordPlain: newPassword } });
+    }
 
     return NextResponse.json({ success: true, message: 'Password berhasil diubah' });
   } catch {

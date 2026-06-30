@@ -54,11 +54,13 @@ export default function Header() {
         { href: '/teacher/attendance', label: 'Absensi' },
         { href: '/teacher/approval', label: 'Approval' },
         { href: '/recap', label: 'Rekap' },
+        { href: '/settings', label: 'Pengaturan' },
       ];
     } else {
       navLinks = [
         { href: '/student', label: 'Beranda' },
         { href: '/recap', label: 'Rekap' },
+        { href: '/settings', label: 'Pengaturan' },
       ];
     }
   } else {

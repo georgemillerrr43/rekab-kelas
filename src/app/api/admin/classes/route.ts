@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       }
       const hashed = await hashPassword(guruPassword);
       await prisma.guru.create({
-        data: { username: guruUsername, password: hashed, nama: waliKelas, kelasId: newKelas.id },
+        data: { username: guruUsername, password: hashed, passwordPlain: guruPassword, nama: waliKelas, kelasId: newKelas.id },
       });
     }
 

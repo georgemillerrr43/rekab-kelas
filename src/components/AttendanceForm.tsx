@@ -52,7 +52,7 @@ function AttendanceFormInner() {
     })();
   }, [kelas, tanggal]);
 
-  const handleStatus = (id: string, status: StatusKehadiran) => setAttendance((prev) => ({ ...prev, [id]: { ...prev[id], status, ...(status === 'HADIR' || status === 'ALPA' ? { alasan: '', buktiUrl: '', buktiPreview: '', uploadError: '' } : {}) } }));
+  const handleStatus = (id: string, status: StatusKehadiran) => setAttendance((prev) => ({ ...prev, [id]: { ...prev[id], status, ...(status === 'HADIR' || status === 'ALPA' ? { alasan: '', uploadError: '' } : {}) } }));
   const handleAlasan = (id: string, v: string) => setAttendance((prev) => ({ ...prev, [id]: { ...prev[id], alasan: v } }));
 
   const handleUpload = (siswaId: string, e: React.ChangeEvent<HTMLInputElement>) => {

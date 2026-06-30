@@ -36,10 +36,10 @@ export async function sendWhatsAppNotification(payload: WANotificationPayload): 
 }> {
   const { whatsappOrangTua } = payload;
 
-  if (!whatsappOrangTua || !whatsappOrangTua.startsWith('62')) {
+  if (!whatsappOrangTua) {
     return {
       success: false,
-      error: 'Nomor WhatsApp orang tua tidak valid. Harus diawali 62 (contoh: 628123456789).',
+      error: 'Nomor WhatsApp orang tua tidak diisi.',
     };
   }
 
@@ -67,7 +67,7 @@ export async function sendWhatsAppNotification(payload: WANotificationPayload): 
       body: JSON.stringify({
         target: whatsappOrangTua,
         message: messageText,
-        countryCode: '62',
+        ...(whatsappOrangTua.startsWith('62') ? { countryCode: '62' } : {}),
       }),
     });
 

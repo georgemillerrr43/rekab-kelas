@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
+import { sendWhatsAppNotification } from '@/utils/waNotification';
 
 export async function GET(req: NextRequest) {
   try {
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest) {
     if (!tanggal || !data) return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 });
 
     const kelasSiswaIds = new Set(guru.kelas.siswa.map(s => s.id));
+    const allSiswa = await prisma.siswa.findMany({ where: { id: { in: Array.from(kelasSiswaIds) } } });
+    const siswaMap = new Map(allSiswa.map(s => [s.id, s]));
     for (const item of data) {
       if (!kelasSiswaIds.has(item.siswaId)) continue;
 
@@ -84,12 +87,18 @@ export async function POST(req: NextRequest) {
           update: { status: item.status, ...(izinId ? { izinId } : {}) },
           create: { siswaId: item.siswaId, tanggal: new Date(tanggal), status: item.status, ...(izinId ? { izinId } : {}) },
         });
+
+        await sendWANotif(item, tanggal, siswaMap);
       } else {
         await prisma.kehadiran.upsert({
           where: { siswaId_tanggal: { siswaId: item.siswaId, tanggal: new Date(tanggal) } },
           update: { status: item.status },
           create: { siswaId: item.siswaId, tanggal: new Date(tanggal), status: item.status },
         });
+
+        if (item.status === 'ALPA') {
+          await sendWANotif(item, tanggal, siswaMap);
+        }
       }
     }
     return NextResponse.json({ success: true });
@@ -97,4 +106,18 @@ export async function POST(req: NextRequest) {
     console.error('POST /api/teacher/attendance:', e);
     return NextResponse.json({ error: 'Gagal menyimpan' }, { status: 500 });
   }
+}
+
+async function sendWANotif(item: any, tanggal: string, siswaMap: Map<string, any>) {
+  const siswa = siswaMap.get(item.siswaId);
+  if (!siswa) return;
+  const result = await sendWhatsAppNotification({
+    namaSiswa: siswa.nama,
+    nis: siswa.nis,
+    tanggal,
+    status: item.status,
+    whatsappOrangTua: siswa.whatsappOrangTua,
+    alasan: item.alasan || undefined,
+  });
+  if (!result.success) console.error('[WA] Gagal kirim ke', siswa.nama, '-', result.error);
 }
