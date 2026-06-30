@@ -22,32 +22,28 @@ Aplikasi ini dibuat karena di banyak sekolah, pencatatan kehadiran siswa masih m
 ## Alur Sistem (3 Peran)
 
 ```mermaid
-flowchart TB
-    subgraph SISWA["Siswa"]
-        direction TB
-        S1[Mengajukan Izin] --> S2[Upload Foto Bukti]
-        S2 --> S3[Lihat Status Approval]
-        S3 --> S4[Lihat Rekap Sendiri]
-    end
-
-    subgraph GURU["Guru / Wali Kelas"]
-        direction TB
-        G1[Catat Absensi Harian] --> G2[Setujui / Tolak Izin]
-    end
-
+flowchart LR
     subgraph ADMIN["Admin"]
-        direction TB
         A1[Buat Kelas] --> A2[Buat Akun Guru]
         A2 --> A3[Buat Data Siswa]
         A3 --> A4[Pantau Semua Kelas]
     end
 
-    S1 -.->|"Notifikasi WA ke Orang Tua"| S4
-    G1 -.->|"WA: Alpa / Izin / Sakit"| S4
-    S1 -->|"Ajukan Izin"| G2
-    G2 -->|"Approved / Rejected"| S3
+    subgraph GURU["Guru / Wali Kelas"]
+        G1[Catat Absensi] --> G2[Setujui Izin]
+    end
+
+    subgraph SISWA["Siswa"]
+        S1[Ajukan Izin] --> S2[Upload Foto]
+        S2 --> S3[Lihat Status]
+        S3 --> S4[Lihat Rekap]
+    end
+
+    S1 --> G2
+    G2 -->|Approved atau Rejected| S3
     A4 --> G1
     A3 --> G1
+    G1 -.->|WA notif| S4
 ```
 
 | Peran | Tugas Utama |
